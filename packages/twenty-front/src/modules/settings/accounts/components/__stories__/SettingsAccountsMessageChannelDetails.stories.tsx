@@ -22,6 +22,8 @@ const meta: Meta<typeof SettingsAccountsMessageChannelDetails> = {
   args: {
     messageChannel: {
       id: '20202020-ef5a-4822-9e08-ce6e6a4dcb6a',
+      handle: 'hello@twenty.com',
+      connectedAccountId: '20202020-4dc0-4b8e-9b4f-8b0e1d9a2f11',
       contactAutoCreationPolicy: MessageChannelContactAutoCreationPolicy.SENT,
       excludeNonProfessionalEmails: true,
       excludeGroupEmails: false,
