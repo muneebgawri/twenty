@@ -32,7 +32,6 @@ type SendEmailParams = {
   inReplyTo?: string;
   files?: EmailAttachment[];
   scheduledAt?: string;
-  signature?: string;
   trackEmail?: boolean;
 };
 
@@ -61,7 +60,6 @@ export const useSendEmail = () => {
               inReplyTo: params.inReplyTo,
               files: params.files,
               scheduledAt: params.scheduledAt,
-              signature: params.signature,
               trackEmail: params.trackEmail,
             },
           },

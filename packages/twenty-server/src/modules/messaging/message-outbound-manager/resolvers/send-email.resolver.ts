@@ -13,7 +13,9 @@ import { InjectMessageQueue } from 'src/engine/core-modules/message-queue/decora
 import { MessageQueue } from 'src/engine/core-modules/message-queue/message-queue.constants';
 import { MessageQueueService } from 'src/engine/core-modules/message-queue/services/message-queue.service';
 import { ResolverValidationPipe } from 'src/engine/core-modules/graphql/pipes/resolver-validation.pipe';
+import { UserEntity } from 'src/engine/core-modules/user/user.entity';
 import { WorkspaceEntity } from 'src/engine/core-modules/workspace/workspace.entity';
+import { AuthUser } from 'src/engine/decorators/auth/auth-user.decorator';
 import { AuthUserWorkspaceId } from 'src/engine/decorators/auth/auth-user-workspace-id.decorator';
 import { AuthWorkspace } from 'src/engine/decorators/auth/auth-workspace.decorator';
 import { NoPermissionGuard } from 'src/engine/guards/no-permission.guard';
@@ -44,6 +46,7 @@ export class SendEmailResolver {
     @Args('input') input: SendEmailInput,
     @AuthWorkspace() workspace: WorkspaceEntity,
     @AuthUserWorkspaceId() userWorkspaceId: string,
+    @AuthUser() user: UserEntity,
   ): Promise<SendEmailOutputDTO> {
     try {
       if (input.scheduledAt) {
@@ -62,9 +65,24 @@ export class SendEmailResolver {
           };
         }
 
+        // Verify the sender owns the account BEFORE reporting success.
+        // Previously this ran only when the job fired, so a user without
+        // access saw "scheduled" and the failure surfaced hours later in a
+        // worker log with nothing shown to them.
+        await this.outboundEmailDispatchService.assertCanSendFrom({
+          connectedAccountId: input.connectedAccountId,
+          userWorkspaceId,
+          workspaceId: workspace.id,
+        });
+
         await this.messageQueueService.add<ScheduledEmailJobData>(
           ScheduledEmailJob.name,
-          { input, workspaceId: workspace.id, userWorkspaceId },
+          {
+            input,
+            workspaceId: workspace.id,
+            userWorkspaceId,
+            userId: user.id,
+          },
           { delay },
         );
 
@@ -75,6 +93,7 @@ export class SendEmailResolver {
         input,
         workspaceId: workspace.id,
         userWorkspaceId,
+        userId: user.id,
       });
     } catch (error) {
       if (error instanceof ForbiddenException) {

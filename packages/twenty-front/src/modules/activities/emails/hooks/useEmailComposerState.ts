@@ -36,29 +36,9 @@ export const useEmailComposerState = ({
   const [showCcBcc, setShowCcBcc] = useState(false);
   const [files, setFiles] = useState<EmailAttachment[]>([]);
   const [scheduledAt, setScheduledAt] = useState('');
-  const [signature, setSignature] = useState('');
   const [trackEmail, setTrackEmail] = useState(true);
 
   const { sendEmail, loading } = useSendEmail();
-
-  useEffect(() => {
-    const storedSignature = globalThis.localStorage?.getItem(
-      `email-signature:${connectedAccountId}`,
-    );
-
-    setSignature(storedSignature ?? '');
-  }, [connectedAccountId]);
-
-  const updateSignature = useCallback(
-    (value: string) => {
-      setSignature(value);
-      globalThis.localStorage?.setItem(
-        `email-signature:${connectedAccountId}`,
-        value,
-      );
-    },
-    [connectedAccountId],
-  );
 
   const recipientCount = useMemo(
     () => countRecipients(to) + countRecipients(cc) + countRecipients(bcc),
@@ -94,7 +74,6 @@ export const useEmailComposerState = ({
       scheduledAt: scheduledAt
         ? new Date(scheduledAt).toISOString()
         : undefined,
-      signature: signature || undefined,
       trackEmail,
     });
 
@@ -111,7 +90,6 @@ export const useEmailComposerState = ({
     defaultInReplyTo,
     files,
     scheduledAt,
-    signature,
     trackEmail,
     sendEmail,
     onSent,
@@ -137,8 +115,6 @@ export const useEmailComposerState = ({
     setFiles,
     scheduledAt,
     setScheduledAt,
-    signature,
-    setSignature: updateSignature,
     trackEmail,
     setTrackEmail,
     handleSend,
