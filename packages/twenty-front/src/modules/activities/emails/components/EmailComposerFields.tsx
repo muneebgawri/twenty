@@ -65,19 +65,6 @@ const StyledInput = styled.input`
   width: 100%;
 `;
 
-const StyledSignature = styled.textarea`
-  background: ${themeCssVariables.background.primary};
-  border: 1px solid ${themeCssVariables.border.color.medium};
-  border-radius: ${themeCssVariables.border.radius.sm};
-  box-sizing: border-box;
-  color: ${themeCssVariables.font.color.primary};
-  font: inherit;
-  min-height: 64px;
-  padding: ${themeCssVariables.spacing[2]};
-  resize: vertical;
-  width: 100%;
-`;
-
 const StyledCheckbox = styled.label`
   align-items: center;
   color: ${themeCssVariables.font.color.secondary};
@@ -181,16 +168,6 @@ export const EmailComposerFields = ({
             min={getMinimumScheduleTime()}
             onChange={(event) =>
               composerState.setScheduledAt(event.currentTarget.value)
-            }
-          />
-        </StyledOption>
-        <StyledOption>
-          {t`Email signature`}
-          <StyledSignature
-            value={composerState.signature}
-            placeholder={t`Saved separately for each connected account`}
-            onChange={(event) =>
-              composerState.setSignature(event.currentTarget.value)
             }
           />
         </StyledOption>

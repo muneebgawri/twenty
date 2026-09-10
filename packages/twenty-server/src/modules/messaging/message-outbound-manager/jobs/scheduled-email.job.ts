@@ -10,6 +10,8 @@ export type ScheduledEmailJobData = {
   input: SendEmailInput;
   workspaceId: string;
   userWorkspaceId: string;
+  /** Needed to resolve the sender's stored signature when the job runs. */
+  userId: string;
 };
 
 @Processor({ queueName: MessageQueue.messagingQueue, scope: Scope.REQUEST })

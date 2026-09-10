@@ -38,8 +38,9 @@ export class SendEmailInput {
   @Field(() => String, { nullable: true })
   scheduledAt?: string;
 
-  @Field(() => String, { nullable: true })
-  signature?: string;
+  // NOTE: there is deliberately no `signature` field. The signature is resolved
+  // server-side from the sender's stored preference — see EmailSignatureService.
+  // Accepting it from the client made the signature whatever that browser held.
 
   @Field(() => Boolean, { nullable: true, defaultValue: true })
   trackEmail?: boolean;
