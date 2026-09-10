@@ -22,6 +22,18 @@ export const computeStandardPersonViews = (
         icon: 'IconList',
       },
     }),
+    personalLeads: createStandardViewFlatMetadata({
+      ...args,
+      objectName: 'person',
+      context: {
+        viewName: 'personalLeads',
+        name: 'My leads',
+        type: ViewType.TABLE,
+        key: null,
+        position: 1,
+        icon: 'IconUserHeart',
+      },
+    }),
     personRecordPageFields: createStandardViewFlatMetadata({
       ...args,
       objectName: 'person',

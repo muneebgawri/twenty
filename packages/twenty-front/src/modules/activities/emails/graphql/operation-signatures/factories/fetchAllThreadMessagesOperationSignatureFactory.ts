@@ -31,6 +31,13 @@ export const fetchAllThreadMessagesOperationSignatureFactory: RecordGqlOperation
     subject: true,
     text: true,
     receivedAt: true,
+    deliveryStatus: true,
+    scheduledAt: true,
+    sentAt: true,
+    firstOpenedAt: true,
+    lastClickedAt: true,
+    openCount: true,
+    clickCount: true,
     messageThread: {
       id: true,
     },

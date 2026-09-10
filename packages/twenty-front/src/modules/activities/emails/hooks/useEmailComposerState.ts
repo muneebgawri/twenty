@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { MAX_EMAIL_RECIPIENTS } from 'twenty-shared/constants';
 import { type EmailAttachment } from 'twenty-shared/types';
 
@@ -35,8 +35,30 @@ export const useEmailComposerState = ({
   const [body, setBody] = useState('');
   const [showCcBcc, setShowCcBcc] = useState(false);
   const [files, setFiles] = useState<EmailAttachment[]>([]);
+  const [scheduledAt, setScheduledAt] = useState('');
+  const [signature, setSignature] = useState('');
+  const [trackEmail, setTrackEmail] = useState(true);
 
   const { sendEmail, loading } = useSendEmail();
+
+  useEffect(() => {
+    const storedSignature = globalThis.localStorage?.getItem(
+      `email-signature:${connectedAccountId}`,
+    );
+
+    setSignature(storedSignature ?? '');
+  }, [connectedAccountId]);
+
+  const updateSignature = useCallback(
+    (value: string) => {
+      setSignature(value);
+      globalThis.localStorage?.setItem(
+        `email-signature:${connectedAccountId}`,
+        value,
+      );
+    },
+    [connectedAccountId],
+  );
 
   const recipientCount = useMemo(
     () => countRecipients(to) + countRecipients(cc) + countRecipients(bcc),
@@ -69,6 +91,11 @@ export const useEmailComposerState = ({
       body,
       inReplyTo: defaultInReplyTo,
       files: files.length > 0 ? files : undefined,
+      scheduledAt: scheduledAt
+        ? new Date(scheduledAt).toISOString()
+        : undefined,
+      signature: signature || undefined,
+      trackEmail,
     });
 
     if (success) {
@@ -83,6 +110,9 @@ export const useEmailComposerState = ({
     body,
     defaultInReplyTo,
     files,
+    scheduledAt,
+    signature,
+    trackEmail,
     sendEmail,
     onSent,
     exceedsRecipientLimit,
@@ -105,6 +135,12 @@ export const useEmailComposerState = ({
     setShowCcBcc,
     files,
     setFiles,
+    scheduledAt,
+    setScheduledAt,
+    signature,
+    setSignature: updateSignature,
+    trackEmail,
+    setTrackEmail,
     handleSend,
     loading,
     canSend,
@@ -113,5 +149,6 @@ export const useEmailComposerState = ({
     recipientCount,
     exceedsRecipientLimit,
     maxRecipients: MAX_EMAIL_RECIPIENTS,
+    isScheduled: scheduledAt.length > 0,
   };
 };

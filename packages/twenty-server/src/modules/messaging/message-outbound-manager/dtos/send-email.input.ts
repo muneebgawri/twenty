@@ -34,4 +34,13 @@ export class SendEmailInput {
 
   @Field(() => [SendEmailAttachmentInput], { nullable: true })
   files?: SendEmailAttachmentInput[];
+
+  @Field(() => String, { nullable: true })
+  scheduledAt?: string;
+
+  @Field(() => String, { nullable: true })
+  signature?: string;
+
+  @Field(() => Boolean, { nullable: true, defaultValue: true })
+  trackEmail?: boolean;
 }

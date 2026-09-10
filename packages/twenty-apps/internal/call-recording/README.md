@@ -1,3 +1,24 @@
+# OpenPhone / Quo call recording
+
+This app adds a **Call with OpenPhone** command to Person records and imports
+completed call recordings into the Call recordings object.
+
+## OpenPhone / Quo setup
+
+1. Set `OPENPHONE_WEBHOOK_SIGNING_KEY` for the app runtime to the base64 signing
+   key shown by OpenPhone / Quo when the webhook is created.
+2. Deploy the app and copy the public URL for the `openphone-webhook` logic
+   function (`/openphone/webhook`).
+3. In OpenPhone / Quo, create a webhook for `call.recording.completed` and point
+   it at that URL.
+4. Set OpenPhone / Quo as the operating system's default handler for `tel:`
+   links to enable CRM click-to-call.
+
+Webhook requests are HMAC verified, rejected after five minutes, and processed
+idempotently by provider call ID. Imported audio is copied into Twenty file
+storage and linked to a Person when the external phone number matches the
+Person's primary phone number.
+
 This is a [Twenty](https://twenty.com) application project bootstrapped with [`create-twenty-app`](https://www.npmjs.com/package/create-twenty-app).
 
 ## Getting Started
