@@ -7,11 +7,16 @@
 #
 # Args:
 #   $1  TWENTY_VERSION  (default: v2.2.0)
+#   $2  REVISION        (optional) overlay revision, e.g. 2 -> v2.2.0-pinion.2.
+#                       Use a new revision whenever the overlay changes so the
+#                       previous image stays on disk for a one-line rollback.
 
 set -euo pipefail
 
 TWENTY_VERSION="${1:-v2.2.0}"
-PINION_TAG="twentycrm/twenty:${TWENTY_VERSION}-pinion"
+REVISION="${2:-}"
+PINION_SUFFIX="${TWENTY_VERSION}-pinion${REVISION:+.${REVISION}}"
+PINION_TAG="twentycrm/twenty:${PINION_SUFFIX}"
 COMPOSE_FILE="/opt/twenty/docker-compose.yml"
 
 echo "=== Building ${PINION_TAG} from ${TWENTY_VERSION} ==="
@@ -35,13 +40,13 @@ docker run --rm --entrypoint /bin/sh "${PINION_TAG}" \
   -c 'grep -c "Pinion CRM" /app/packages/twenty-emails/dist/index.mjs' || true
 
 echo
-echo "=== Updating /opt/twenty/.env TAG → ${TWENTY_VERSION}-pinion ==="
+echo "=== Updating /opt/twenty/.env TAG → ${PINION_SUFFIX} ==="
 ENV_FILE=/opt/twenty/.env
-if sudo grep -qE "^TAG=${TWENTY_VERSION}-pinion\$" "${ENV_FILE}"; then
-  echo "  TAG already set to ${TWENTY_VERSION}-pinion, no edit needed"
+if sudo grep -qE "^TAG=${PINION_SUFFIX}\$" "${ENV_FILE}"; then
+  echo "  TAG already set to ${PINION_SUFFIX}, no edit needed"
 else
   sudo cp "${ENV_FILE}" "${ENV_FILE}.pre-pinion-$(date -u +%Y%m%dT%H%M%SZ)"
-  sudo sed -i -E "s|^TAG=.*|TAG=${TWENTY_VERSION}-pinion|" "${ENV_FILE}"
+  sudo sed -i -E "s|^TAG=.*|TAG=${PINION_SUFFIX}|" "${ENV_FILE}"
   echo "  updated; backup saved as ${ENV_FILE}.pre-pinion-*"
   echo "  new TAG line:"
   sudo grep "^TAG=" "${ENV_FILE}"
