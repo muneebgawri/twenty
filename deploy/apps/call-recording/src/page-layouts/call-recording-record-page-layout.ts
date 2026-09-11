@@ -1,4 +1,4 @@
-import { CALL_RECORDING_SUMMARY_VIEWER_FRONT_COMPONENT_UNIVERSAL_IDENTIFIER } from 'src/constants/call-recording-summary-viewer-front-component-universal-identifier';
+import { PEOPLE_ON_CALL_RECORDING_ID } from 'src/fields/people-on-call-recording.field';
 import { CALL_RECORDING_VIEWER_FRONT_COMPONENT_UNIVERSAL_IDENTIFIER } from 'src/constants/call-recording-viewer-front-component-universal-identifier';
 import { CALL_RECORDING_OBJECT_UNIVERSAL_IDENTIFIER } from 'src/objects/call-recording';
 import { definePageLayout, PageLayoutTabLayoutMode } from 'twenty-sdk/define';
@@ -9,30 +9,48 @@ export default definePageLayout({
   type: 'RECORD_PAGE',
   objectUniversalIdentifier: CALL_RECORDING_OBJECT_UNIVERSAL_IDENTIFIER,
   tabs: [
+    // Same shape as Twenty's standard record pages: the lowest-positioned tab
+    // is the pinned left panel, and it holds the record's fields (person,
+    // direction, phone, duration). Upstream put an AI-summary widget here,
+    // which OpenPhone calls never have, so the fields were not shown at all.
     {
-      universalIdentifier: 'e6b2d8f4-7a13-4c59-b2e1-9d4f0c8a3b67',
-      title: 'Summary',
-      position: 50,
-      icon: 'IconSparkles',
-      layoutMode: PageLayoutTabLayoutMode.CANVAS,
+      universalIdentifier: '3f6d0c2a-8b41-4e7d-9a53-c1e2f4b6d809',
+      title: 'Home',
+      position: 10,
+      icon: 'IconHome',
+      layoutMode: PageLayoutTabLayoutMode.VERTICAL_LIST,
       widgets: [
         {
-          universalIdentifier: 'e5c93fce-76b4-41e9-9c5d-9b17e034366c',
-          title: 'Summary',
-          type: 'FRONT_COMPONENT',
+          universalIdentifier: '7a2e9d41-5c3b-4f68-b0d7-2e8a6c1f4b93',
+          title: 'Fields',
+          type: 'FIELDS',
           configuration: {
-            configurationType: 'FRONT_COMPONENT',
-            frontComponentUniversalIdentifier:
-              CALL_RECORDING_SUMMARY_VIEWER_FRONT_COMPONENT_UNIVERSAL_IDENTIFIER,
+            configurationType: 'FIELDS',
+            viewUniversalIdentifier: null,
+            newFieldDefaultVisibility: true,
+          },
+        },
+        // The default Fields widget hides every relation field, so the linked
+        // Person would not appear at all. Show it as its own card.
+        {
+          universalIdentifier: '0b8f4e27-6d19-4a3c-9e51-7c2d8a4f1e60',
+          title: 'Person',
+          type: 'FIELD',
+          configuration: {
+            configurationType: 'FIELD',
+            // In a manifest this key carries the field's universal identifier;
+            // install resolves it to the workspace's field id.
+            fieldMetadataId: PEOPLE_ON_CALL_RECORDING_ID,
+            fieldDisplayMode: 'CARD',
           },
         },
       ],
     },
     {
       universalIdentifier: 'c4f8e2a6-3d71-4b95-8e0c-1a9f6d5b7c34',
-      title: 'Transcript',
+      title: 'Recording',
       position: 100,
-      icon: 'IconVideo',
+      icon: 'IconPlayerPlay',
       layoutMode: PageLayoutTabLayoutMode.CANVAS,
       widgets: [
         {
