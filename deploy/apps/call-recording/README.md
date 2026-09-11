@@ -45,6 +45,26 @@ yarn twenty deploy -r prod     # builds and uploads the tarball
 yarn twenty install -r prod    # installs it into the workspace
 ```
 
+## After every deploy: re-check the signing key
+
+Installing a new version of this app can reset its secret application
+variables to empty. It happened on production upgrading 0.3.2 -> 0.4.1: the
+webhook then failed every delivery with "OPENPHONE_WEBHOOK_SIGNING_KEY is not
+configured" until the key was pasted again.
+
+After `twenty app:install`, confirm the webhook still gets past the key check:
+
+```bash
+curl -s -X POST https://<host>/s/openphone/webhook \
+  -H 'content-type: application/json' -d '{}'
+# want: "Missing openphone-signature header"
+# bad:  "OPENPHONE_WEBHOOK_SIGNING_KEY is not configured"  -> re-paste the key
+```
+
+Or send a test request from the webhook's page in OpenPhone / Quo: a signed
+delivery should fail only on downloading their sample audio (403), which means
+the signature check passed.
+
 ## OpenPhone setup
 
 1. In OpenPhone, go to Settings → Integrations → Webhooks. Create a webhook for
