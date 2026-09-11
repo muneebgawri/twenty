@@ -83,9 +83,34 @@ RUN find /app/packages/twenty-emails/dist \
 COPY --from=icon-gen /out/android/ /app/packages/twenty-server/dist/front/images/icons/android/
 COPY --from=icon-gen /out/ios/     /app/packages/twenty-server/dist/front/images/icons/ios/
 
+# 5. Bug fix: app front-component widgets render "No Data" on record pages.
+#
+# FrontComponentWidgetRenderer only accepts a configuration whose __typename is
+# "FrontComponentConfiguration". Record pages are fed from the flat metadata
+# store, whose configurations carry configurationType but no __typename, so
+# every app widget on a record page (e.g. the OpenPhone call-recording player)
+# falls through to the "No Data" placeholder. Still present on upstream main as
+# of 2026-09. This also accepts configurationType === "FRONT_COMPONENT".
+#
+# The bundle is minified, so identifiers are matched generically. The build fails
+# unless exactly one site is patched: if an upgrade moves or fixes this code,
+# re-check upstream and drop or adjust the patch instead of shipping silently.
+RUN set -eu; \
+    cd /app/packages/twenty-server/dist/front/assets; \
+    pattern='!([A-Za-z_$][A-Za-z0-9_$]*)\(([A-Za-z_$][A-Za-z0-9_$]*),"FrontComponentConfiguration"\)\)return'; \
+    files=$(grep -lE "$pattern" -- *.js || true); \
+    count=$(grep -ohE "$pattern" -- *.js | wc -l); \
+    if [ "$count" -ne 1 ]; then \
+      echo "front-component widget patch: expected 1 match, found $count" >&2; exit 1; \
+    fi; \
+    sed -i -E "s/$pattern/!(\1(\2,\"FrontComponentConfiguration\")||\2?.configurationType===\"FRONT_COMPONENT\"))return/" $files; \
+    grep -qF '?.configurationType==="FRONT_COMPONENT"))return' $files; \
+    echo "front-component widget patch applied to $files"
+
 # Marker — Docker image label so we can tell at a glance that the overlay
 # is applied. (Non-root user inside the image can't write to /app, so we
 # use LABEL metadata instead of a marker file.)
 # Inspect with: docker image inspect <tag> --format '{{.Config.Labels}}'
 LABEL co.pinion.branding-stage="stage2"
 LABEL co.pinion.branding-applied-on="2026-05-08"
+LABEL co.pinion.patches="front-component-widget-typename"
