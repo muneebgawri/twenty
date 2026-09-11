@@ -20,3 +20,8 @@ s/using Twenty/using Pinion CRM/g
 s/use Twenty again/use Pinion CRM again/g
 s/What is Twenty?/What is Pinion CRM?/g
 s/It's a CRM, a software to help businesses manage their customer data and relationships efficiently\./Pinion CRM is the customer relationship platform powering Pinion Newswire's outreach and editorial workflows./g
+# Added for v2.39.5 (2026-09-12). Trial and billing strings are left alone:
+# billing is off on this self-hosted instance.
+s/give Twenty another try/give Pinion CRM another try/g
+s/required for Twenty to work/required for Pinion CRM to work/g
+s/version of the Twenty server/version of the Pinion CRM server/g
