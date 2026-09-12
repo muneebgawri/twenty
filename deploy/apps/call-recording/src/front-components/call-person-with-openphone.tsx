@@ -3,10 +3,7 @@ import { useEffect, useState } from 'react';
 import { toDialableNumber } from 'src/utils/phone-match';
 import { CoreApiClient } from 'twenty-client-sdk/core';
 import { defineFrontComponent } from 'twenty-sdk/define';
-import {
-  numberOfSelectedRecords,
-  useRecordId,
-} from 'twenty-sdk/front-component';
+import { useRecordId } from 'twenty-sdk/front-component';
 
 type State =
   | { kind: 'loading' }
@@ -85,21 +82,14 @@ const CallPersonWithOpenPhone = () => {
   );
 };
 
+export const CALL_PERSON_FRONT_COMPONENT_UNIVERSAL_IDENTIFIER =
+  'f8312dd9-c712-48b1-b4a4-49d4d4c87afc';
+
+// The "Call with OpenPhone" command that opens this component is defined in
+// src/command-menu-items (SDK 2.39 moved commands out of front components).
 export default defineFrontComponent({
-  universalIdentifier: 'f8312dd9-c712-48b1-b4a4-49d4d4c87afc',
+  universalIdentifier: CALL_PERSON_FRONT_COMPONENT_UNIVERSAL_IDENTIFIER,
   name: 'Call person with OpenPhone',
   description: 'Shows a click-to-call link for the selected person',
   component: CallPersonWithOpenPhone,
-  command: {
-    universalIdentifier: '2b991919-6f27-4f3d-8d72-7194ed7d0904',
-    label: 'Call with OpenPhone',
-    icon: 'IconPhoneCall',
-    isPinned: true,
-    availabilityType: 'RECORD_SELECTION',
-    // Written as an expression, not a string: the SDK's build step compiles
-    // it into the stored availability rule.
-    conditionalAvailabilityExpression: numberOfSelectedRecords === 1,
-    availabilityObjectUniversalIdentifier:
-      '20202020-e674-48e5-a542-72570eee7213',
-  },
 });

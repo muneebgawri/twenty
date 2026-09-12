@@ -1,6 +1,6 @@
 {
   "name": "call-recording",
-  "version": "0.3.2",
+  "version": "0.4.1",
   "private": true,
   "license": "MIT",
   "engines": {
@@ -21,8 +21,8 @@
     "@emotion/styled": "^11.14.0",
     "react-loading-skeleton": "^3.5.0",
     "react-markdown": "^10.1.0",
-    "twenty-client-sdk": "2.2.0",
-    "twenty-sdk": "2.2.0"
+    "twenty-client-sdk": "2.39.0",
+    "twenty-sdk": "2.39.0"
   },
   "devDependencies": {
     "@types/node": "^24.7.2",

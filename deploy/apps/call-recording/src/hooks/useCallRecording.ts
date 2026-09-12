@@ -1,126 +1,80 @@
 import { useEffect, useState } from 'react';
-import { useRecordId } from 'twenty-sdk/front-component';
-import { CoreApiClient } from 'twenty-client-sdk/core';
+
 import { isDefined } from 'src/utils/is-defined';
+import { CoreApiClient } from 'twenty-client-sdk/core';
+import { useRecordId } from 'twenty-sdk/front-component';
 
 // The typed client is generated per workspace by `twenty dev`; outside that
 // the query result is untyped, so the FILES field shape is spelled out here.
-type FileRef = {
+export type AudioFile = {
   fileId: string;
   label: string;
-  url?: string | null;
-  extension?: string | null;
+  url: string | null;
+  extension: string | null;
 };
 
-type CallRecording = {
-  id: string;
-  name: string;
-  createdAt: string;
-  endedAt: string | null;
-  recordingFile: Array<{ fileId: string; label: string; url: string | null; extension: string | null }>;
-  transcriptFile: Array<{ fileId: string; label: string; url: string | null; extension: string | null }>;
-  transcript: { markdown: string | null } | null;
-  summary: { markdown: string | null } | null;
-};
-
-export const useCallRecording = () => {
+// Reads the standard callRecording's `audio` field. Transcript and summary are
+// shown by Twenty's own call-recording widgets, so they are not fetched here.
+export const useCallRecordingAudio = () => {
   const recordId = useRecordId();
-
-  const [callRecording, setCallRecording] = useState<CallRecording | null>(
-    null,
-  );
+  const [audio, setAudio] = useState<AudioFile | null>(null);
   const [loading, setLoading] = useState(true);
-
   const [error, setError] = useState<Error | null>(null);
 
   useEffect(() => {
-    if (!isDefined(recordId)) {
-      setError(new Error('Record ID is not defined'));
+    let cancelled = false;
 
-      setLoading(false);
-      return;
-    }
+    const load = async () => {
+      if (!isDefined(recordId)) {
+        setError(new Error('Record ID is not defined'));
+        setLoading(false);
 
-    const fetchRecord = async () => {
+        return;
+      }
+
       try {
-        setLoading(true);
-        setError(null);
-
-        const client = new CoreApiClient();
-
-        const { callRecording } = await client.query({
+        const result: any = await new CoreApiClient().query({
           callRecording: {
-            __args: {
-              filter: { id: { eq: recordId } },
-            },
-            id: true,
-            name: true,
-            createdAt: true,
-            endedAt: true,
-            recordingFile: {
-              fileId: true,
-              label: true,
-              url: true,
-              extension: true,
-            },
-            transcriptFile: {
-              fileId: true,
-              label: true,
-              url: true,
-              extension: true,
-            },
-            transcript: {
-              markdown: true,
-            },
-            summary: {
-              markdown: true,
-            },
+            __args: { filter: { id: { eq: recordId } } },
+            audio: { fileId: true, label: true, url: true, extension: true },
           },
-        });
+        } as any);
 
-        setCallRecording({
-          id: callRecording?.id ?? '',
-          name: callRecording?.name ?? '',
-          createdAt: callRecording?.createdAt ?? '',
-          endedAt: callRecording?.endedAt ?? null,
-          recordingFile: callRecording?.recordingFile?.map((file: FileRef) => ({
-            fileId: file.fileId,
-            label: file.label,
-            url: file.url ?? null,
-            extension: file.extension ?? null,
-          })) ?? [],
-          transcriptFile: callRecording?.transcriptFile?.map((file: FileRef) => ({
-            fileId: file.fileId,
-            label: file.label,
-            url: file.url ?? null,
-            extension: file.extension ?? null,
-          })) ?? [],
-          transcript: callRecording?.transcript
-            ? { markdown: callRecording.transcript.markdown ?? null }
-            : null,
-          summary: callRecording?.summary
-            ? { markdown: callRecording.summary.markdown ?? null }
-            : null,
-        });
+        const file = result.callRecording?.audio?.[0];
+
+        if (!cancelled) {
+          setAudio(
+            file
+              ? {
+                  fileId: file.fileId,
+                  label: file.label,
+                  url: file.url ?? null,
+                  extension: file.extension ?? null,
+                }
+              : null,
+          );
+        }
       } catch (fetchError) {
-        if (fetchError instanceof Error) {
-          setError(fetchError);
-        } else {
-          setError(new Error('Failed to fetch call recording'));
+        if (!cancelled) {
+          setError(
+            fetchError instanceof Error
+              ? fetchError
+              : new Error('Failed to fetch call recording'),
+          );
         }
       }
 
-      setLoading(false);
+      if (!cancelled) {
+        setLoading(false);
+      }
     };
 
-    fetchRecord();
+    load();
 
     return () => {
-      setCallRecording(null);
-      setLoading(false);
-      setError(null);
+      cancelled = true;
     };
   }, [recordId]);
 
-  return { callRecording, loading, error };
+  return { audio, loading, error };
 };

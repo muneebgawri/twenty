@@ -1,4 +1,4 @@
-import { RECORDING_FILE_FIELD_UNIVERSAL_IDENTIFIER } from 'src/objects/call-recording';
+import { CALL_RECORDING_AUDIO_FIELD_UNIVERSAL_IDENTIFIER } from 'src/constants/runtime-identifiers';
 import {
   OPENPHONE_SIGNATURE_HEADER,
   verifyOpenPhoneSignature,
@@ -69,7 +69,10 @@ const findCallRecordingId = async (
 ): Promise<string | undefined> => {
   const result: any = await client.query({
     callRecordings: {
-      __args: { filter: { providerCallId: { eq: providerCallId } }, first: 1 },
+      __args: {
+        filter: { externalRecordingId: { eq: providerCallId } },
+        first: 1,
+      },
       edges: { node: { id: true } },
     },
   } as any);
@@ -148,7 +151,7 @@ const handler = async (event: RoutePayload<OpenPhoneWebhookBody>) => {
     buffer,
     fileName,
     contentType,
-    RECORDING_FILE_FIELD_UNIVERSAL_IDENTIFIER,
+    CALL_RECORDING_AUDIO_FIELD_UNIVERSAL_IDENTIFIER,
   );
 
   const externalPhone = call.direction === 'incoming' ? call.from : call.to;
@@ -157,17 +160,19 @@ const handler = async (event: RoutePayload<OpenPhoneWebhookBody>) => {
   await client.mutation({
     createCallRecording: {
       __args: {
+        // Standard callRecording fields, plus the openPhone* fields this app
+        // adds. externalRecordingId holds OpenPhone's call id (dedupe key).
         data: {
-          name: `OpenPhone ${call.direction} call - ${externalPhone}`,
-          providerCallId: call.id,
-          direction: call.direction.toUpperCase(),
-          phoneNumber: externalPhone,
-          durationSeconds: recording.duration ?? call.duration ?? 0,
-          createdAt: call.createdAt,
+          title: `OpenPhone ${call.direction} call - ${externalPhone}`,
+          status: 'COMPLETED',
+          startedAt: call.createdAt,
           endedAt: call.completedAt ?? new Date().toISOString(),
-          status: 'ENDED',
-          recordingFile: [{ fileId: uploaded.id, label: fileName }],
-          ...(personId ? { personId } : {}),
+          externalRecordingId: call.id,
+          audio: [{ fileId: uploaded.id, label: fileName }],
+          openPhoneDirection: call.direction.toUpperCase(),
+          openPhoneNumber: externalPhone,
+          openPhoneDurationSeconds: recording.duration ?? call.duration ?? 0,
+          ...(personId ? { openPhonePersonId: personId } : {}),
         },
       },
       id: true,
