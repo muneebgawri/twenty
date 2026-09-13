@@ -71,8 +71,13 @@ const RULES = {
   // --- authored by the member, or filed against their records --------------
   note: ANY_OF(CREATOR, LINKED('noteTargets', ...RECORD_TARGETS)),
 
+  // A dashboard is a definition, not data: its widgets query records through
+  // this same filter, so two people opening one see their own numbers. Keyed on
+  // the creator it was simply empty for everyone else — 0 of the dashboards on
+  // prod carry one.
+  dashboard: VISIBLE,
+
   // --- authored by the member ---------------------------------------------
-  dashboard: CREATOR,
   workflow: CREATOR,
   leadView: CREATOR,
   inboundFailedLead: CREATOR,

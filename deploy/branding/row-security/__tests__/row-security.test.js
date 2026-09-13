@@ -262,6 +262,14 @@ describe('row security', () => {
     assert.match(sql, / OR /);
   });
 
+  it('leaves dashboards readable, since their widgets are filtered per viewer', () => {
+    const dashboard = shape({ name: 'dashboard', columns: ['title', 'createdByWorkspaceMemberId'] });
+
+    // A dashboard is a definition, not data. Keyed on its creator it was empty
+    // for everyone: no dashboard on prod carries one.
+    assert.equal(call(dashboard), undefined);
+  });
+
   it('still hides calendar contents', () => {
     assert.equal(call(shape({ name: 'calendarEvent', columns: ['title'] })).sql, DENY_ALL.sql);
   });
