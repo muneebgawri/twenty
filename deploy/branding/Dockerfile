@@ -107,6 +107,24 @@ RUN set -eu; \
     grep -qF '?.configurationType==="FRONT_COMPONENT"))return' $files; \
     echo "front-component widget patch applied to $files"
 
+# 6. Per-record read restriction for designated roles (our own implementation;
+# Twenty's row-level permissions are a paid feature we are not using).
+#
+# apply-patch.js hooks WorkspaceRepository#applyRowLevelPermissionPredicateForAlias,
+# which runs for the queried table and for every joined alias, so this single
+# hook covers GraphQL, REST, search, aggregates and nested relations. The module
+# only ever ANDs a condition on, denies on any error or unconfigured object, and
+# stays inert unless PINION_RESTRICTED_ROLE_IDS names a role.
+#
+# The build fails if the upstream hook moved, or if the unit tests fail, so an
+# upgrade cannot ship an image where the restriction silently disappeared.
+COPY row-security /app/pinion-row-security
+RUN set -eu; \
+    F=/app/packages/twenty-server/dist/engine/twenty-orm/repository/workspace-repository.js; \
+    node /app/pinion-row-security/apply-patch.js "$F"; \
+    node --check "$F"; \
+    cd /app/pinion-row-security && node --test
+
 # Marker — Docker image label so we can tell at a glance that the overlay
 # is applied. (Non-root user inside the image can't write to /app, so we
 # use LABEL metadata instead of a marker file.)
