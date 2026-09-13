@@ -6,6 +6,7 @@ import { v4 } from 'uuid';
 import { type ConnectedAccountEntity } from 'src/engine/metadata-modules/connected-account/entities/connected-account.entity';
 import { GlobalWorkspaceOrmManager } from 'src/engine/twenty-orm/global-workspace-datasource/global-workspace-orm.manager';
 import { buildSystemAuthContext } from 'src/engine/twenty-orm/utils/build-system-auth-context.util';
+import { MatchParticipantService } from 'src/modules/match-participant/match-participant.service';
 import { MessageDirection } from 'src/modules/messaging/common/enums/message-direction.enum';
 import { type MessageChannelMessageAssociationWorkspaceEntity } from 'src/modules/messaging/common/standard-objects/message-channel-message-association.workspace-entity';
 import { type MessageParticipantWorkspaceEntity } from 'src/modules/messaging/common/standard-objects/message-participant.workspace-entity';
@@ -32,6 +33,7 @@ export class SentMessagePersistenceService {
 
   constructor(
     private readonly globalWorkspaceOrmManager: GlobalWorkspaceOrmManager,
+    private readonly matchParticipantService: MatchParticipantService<MessageParticipantWorkspaceEntity>,
   ) {}
 
   async persistSentMessage(input: PersistSentMessageInput): Promise<string> {
@@ -96,7 +98,21 @@ export class SentMessagePersistenceService {
         );
 
         if (participants.length > 0) {
-          await messageParticipantRepository.insert(participants);
+          const createdParticipants =
+            await messageParticipantRepository.insert(participants);
+
+          // Resolve each handle to the person and workspace member behind it,
+          // exactly as the import pipeline does in saveMessageParticipants.
+          // Without this a sent message carries bare email addresses: it never
+          // appears on the contact's record, and the sender is not linked to
+          // their own message, so anything scoped by participation — including
+          // the open and click counts above — cannot find it.
+          await this.matchParticipantService.matchParticipants({
+            participants: createdParticipants.raw ?? [],
+            objectMetadataName: 'messageParticipant',
+            matchWith: 'workspaceMemberAndPerson',
+            workspaceId: input.workspaceId,
+          });
         }
 
         await associationRepository.insert({
