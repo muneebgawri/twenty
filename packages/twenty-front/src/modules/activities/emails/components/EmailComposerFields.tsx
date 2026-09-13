@@ -39,8 +39,49 @@ const StyledCcBccToggle = styled.button`
   }
 `;
 
+const StyledOptionsGrid = styled.div`
+  display: grid;
+  gap: ${themeCssVariables.spacing[2]};
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+`;
+
+const StyledOption = styled.label`
+  color: ${themeCssVariables.font.color.secondary};
+  display: flex;
+  flex-direction: column;
+  font-size: ${themeCssVariables.font.size.xs};
+  gap: ${themeCssVariables.spacing[1]};
+`;
+
+const StyledInput = styled.input`
+  background: ${themeCssVariables.background.primary};
+  border: 1px solid ${themeCssVariables.border.color.medium};
+  border-radius: ${themeCssVariables.border.radius.sm};
+  box-sizing: border-box;
+  color: ${themeCssVariables.font.color.primary};
+  font: inherit;
+  min-height: 32px;
+  padding: 0 ${themeCssVariables.spacing[2]};
+  width: 100%;
+`;
+
+const StyledCheckbox = styled.label`
+  align-items: center;
+  color: ${themeCssVariables.font.color.secondary};
+  display: flex;
+  font-size: ${themeCssVariables.font.size.sm};
+  gap: ${themeCssVariables.spacing[2]};
+`;
+
 type EmailComposerFieldsProps = {
   composerState: EmailComposerState;
+};
+
+const getMinimumScheduleTime = () => {
+  const date = new Date(Date.now() + 60_000);
+  const timezoneOffset = date.getTimezoneOffset() * 60_000;
+
+  return new Date(date.getTime() - timezoneOffset).toISOString().slice(0, 16);
 };
 
 export const EmailComposerFields = ({
@@ -118,6 +159,29 @@ export const EmailComposerFields = ({
         files={composerState.files}
         onChange={composerState.setFiles}
       />
+      <StyledOptionsGrid>
+        <StyledOption>
+          {t`Send later`}
+          <StyledInput
+            type="datetime-local"
+            value={composerState.scheduledAt}
+            min={getMinimumScheduleTime()}
+            onChange={(event) =>
+              composerState.setScheduledAt(event.currentTarget.value)
+            }
+          />
+        </StyledOption>
+      </StyledOptionsGrid>
+      <StyledCheckbox>
+        <input
+          type="checkbox"
+          checked={composerState.trackEmail}
+          onChange={(event) =>
+            composerState.setTrackEmail(event.currentTarget.checked)
+          }
+        />
+        {t`Track delivery, opens and link clicks`}
+      </StyledCheckbox>
     </StyledFieldsContainer>
   );
 };

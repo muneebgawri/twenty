@@ -7,22 +7,26 @@ import {
 } from '@nestjs/common';
 import { Args, Mutation } from '@nestjs/graphql';
 
-import { FileFolder } from 'twenty-shared/types';
-
 import { MetadataResolver } from 'src/engine/api/graphql/graphql-config/decorators/metadata-resolver.decorator';
 import { AuthGraphqlApiExceptionFilter } from 'src/engine/core-modules/auth/filters/auth-graphql-api-exception.filter';
-import { FileEmailAttachmentService } from 'src/engine/core-modules/file/file-email-attachment/services/file-email-attachment.service';
+import { InjectMessageQueue } from 'src/engine/core-modules/message-queue/decorators/message-queue.decorator';
+import { MessageQueue } from 'src/engine/core-modules/message-queue/message-queue.constants';
+import { MessageQueueService } from 'src/engine/core-modules/message-queue/services/message-queue.service';
 import { ResolverValidationPipe } from 'src/engine/core-modules/graphql/pipes/resolver-validation.pipe';
+import { UserEntity } from 'src/engine/core-modules/user/user.entity';
 import { WorkspaceEntity } from 'src/engine/core-modules/workspace/workspace.entity';
-import { EmailComposerService } from 'src/engine/core-modules/tool/tools/email-tool/email-composer.service';
+import { AuthUser } from 'src/engine/decorators/auth/auth-user.decorator';
 import { AuthUserWorkspaceId } from 'src/engine/decorators/auth/auth-user-workspace-id.decorator';
 import { AuthWorkspace } from 'src/engine/decorators/auth/auth-workspace.decorator';
 import { NoPermissionGuard } from 'src/engine/guards/no-permission.guard';
 import { WorkspaceAuthGuard } from 'src/engine/guards/workspace-auth.guard';
-import { ConnectedAccountMetadataService } from 'src/engine/metadata-modules/connected-account/connected-account-metadata.service';
 import { SendEmailOutputDTO } from 'src/modules/messaging/message-outbound-manager/dtos/send-email-output.dto';
 import { SendEmailInput } from 'src/modules/messaging/message-outbound-manager/dtos/send-email.input';
-import { SendEmailService } from 'src/modules/messaging/message-outbound-manager/services/send-email.service';
+import {
+  ScheduledEmailJob,
+  type ScheduledEmailJobData,
+} from 'src/modules/messaging/message-outbound-manager/jobs/scheduled-email.job';
+import { OutboundEmailDispatchService } from 'src/modules/messaging/message-outbound-manager/services/outbound-email-dispatch.service';
 
 @MetadataResolver()
 @UsePipes(ResolverValidationPipe)
@@ -32,10 +36,9 @@ export class SendEmailResolver {
   private readonly logger = new Logger(SendEmailResolver.name);
 
   constructor(
-    private readonly connectedAccountMetadataService: ConnectedAccountMetadataService,
-    private readonly emailComposerService: EmailComposerService,
-    private readonly fileEmailAttachmentService: FileEmailAttachmentService,
-    private readonly sendEmailService: SendEmailService,
+    private readonly outboundEmailDispatchService: OutboundEmailDispatchService,
+    @InjectMessageQueue(MessageQueue.messagingQueue)
+    private readonly messageQueueService: MessageQueueService,
   ) {}
 
   @Mutation(() => SendEmailOutputDTO)
@@ -43,58 +46,55 @@ export class SendEmailResolver {
     @Args('input') input: SendEmailInput,
     @AuthWorkspace() workspace: WorkspaceEntity,
     @AuthUserWorkspaceId() userWorkspaceId: string,
+    @AuthUser() user: UserEntity,
   ): Promise<SendEmailOutputDTO> {
     try {
-      await this.connectedAccountMetadataService.verifyOwnership({
-        id: input.connectedAccountId,
-        userWorkspaceId,
-        workspaceId: workspace.id,
-      });
+      if (input.scheduledAt) {
+        const scheduledAt = new Date(input.scheduledAt);
 
-      const result = await this.emailComposerService.composeEmail(
-        {
-          recipients: {
-            to: input.to,
-            cc: input.cc ?? '',
-            bcc: input.bcc ?? '',
-          },
-          subject: input.subject,
-          body: input.body,
+        if (Number.isNaN(scheduledAt.getTime())) {
+          return { success: false, error: 'Invalid scheduled date' };
+        }
+
+        const delay = scheduledAt.getTime() - Date.now();
+
+        if (delay < 30_000) {
+          return {
+            success: false,
+            error: 'Scheduled time must be at least 30 seconds in the future',
+          };
+        }
+
+        // Verify the sender owns the account BEFORE reporting success.
+        // Previously this ran only when the job fired, so a user without
+        // access saw "scheduled" and the failure surfaced hours later in a
+        // worker log with nothing shown to them.
+        await this.outboundEmailDispatchService.assertCanSendFrom({
           connectedAccountId: input.connectedAccountId,
-          files: input.files ?? [],
-          inReplyTo: input.inReplyTo,
-        },
-        { workspaceId: workspace.id },
-        { attachmentsFileFolder: FileFolder.EmailAttachment },
-      );
-
-      if (!result.success) {
-        return {
-          success: false,
-          error: result.output.error ?? result.output.message,
-        };
-      }
-
-      const { data } = result;
-
-      const sendResult = await this.sendEmailService.sendComposedEmail(data);
-
-      await this.sendEmailService.persistSentMessage(
-        sendResult,
-        data,
-        workspace.id,
-      );
-
-      const attachmentFileIds = (input.files ?? []).map((file) => file.id);
-
-      if (attachmentFileIds.length > 0) {
-        await this.fileEmailAttachmentService.deleteFiles({
-          fileIds: attachmentFileIds,
+          userWorkspaceId,
           workspaceId: workspace.id,
         });
+
+        await this.messageQueueService.add<ScheduledEmailJobData>(
+          ScheduledEmailJob.name,
+          {
+            input,
+            workspaceId: workspace.id,
+            userWorkspaceId,
+            userId: user.id,
+          },
+          { delay },
+        );
+
+        return { success: true, scheduledAt: scheduledAt.toISOString() };
       }
 
-      return { success: true };
+      return await this.outboundEmailDispatchService.dispatch({
+        input,
+        workspaceId: workspace.id,
+        userWorkspaceId,
+        userId: user.id,
+      });
     } catch (error) {
       if (error instanceof ForbiddenException) {
         throw error;
