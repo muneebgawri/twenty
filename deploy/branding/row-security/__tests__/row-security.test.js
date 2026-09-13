@@ -22,18 +22,47 @@ const shape = ({ name, columns = [], relations = {}, table = name }) => ({
 
 const PERSON = shape({
   name: 'person',
-  columns: ['personOwnerId', 'createdByWorkspaceMemberId'],
+  columns: ['personOwnerId', 'companyId', 'createdByWorkspaceMemberId'],
   relations: {
     personOwner: { joinColumnName: 'personOwnerId', targetObjectMetadataId: 'id-workspaceMember' },
+    company: {
+      fieldMetadataId: 'field-person-company',
+      joinColumnName: 'companyId',
+      targetObjectMetadataId: 'id-company',
+    },
   },
 });
-const NOTE = shape({ name: 'note', columns: ['createdByWorkspaceMemberId'] });
+const NOTE = shape({
+  name: 'note',
+  columns: ['createdByWorkspaceMemberId'],
+  relations: {
+    noteTargets: {
+      targetObjectMetadataId: 'id-noteTarget',
+      targetFieldMetadataId: 'field-noteTarget-note',
+    },
+  },
+});
 const NOTE_TARGET = shape({
   name: 'noteTarget',
-  columns: ['noteId', 'personId'],
+  columns: ['noteId', 'targetPersonId'],
   relations: {
-    note: { joinColumnName: 'noteId', targetObjectMetadataId: 'id-note' },
-    person: { joinColumnName: 'personId', targetObjectMetadataId: 'id-person' },
+    note: {
+      fieldMetadataId: 'field-noteTarget-note',
+      joinColumnName: 'noteId',
+      targetObjectMetadataId: 'id-note',
+    },
+    targetPerson: { joinColumnName: 'targetPersonId', targetObjectMetadataId: 'id-person' },
+  },
+});
+const COMPANY = shape({
+  name: 'company',
+  columns: ['accountOwnerId'],
+  relations: {
+    accountOwner: { joinColumnName: 'accountOwnerId', targetObjectMetadataId: 'id-workspaceMember' },
+    people: {
+      targetObjectMetadataId: 'id-person',
+      targetFieldMetadataId: 'field-person-company',
+    },
   },
 });
 const MESSAGE_LIST = shape({ name: 'messageList', columns: ['createdByWorkspaceMemberId'] });
@@ -52,6 +81,8 @@ const UNKNOWN = shape({ name: 'somethingUpstreamAdded', columns: ['secret'] });
 const SHAPES = {
   'id-person': PERSON,
   'id-note': NOTE,
+  'id-noteTarget': NOTE_TARGET,
+  'id-company': COMPANY,
   'id-workspaceMember': MEMBER_SHAPE,
   'id-messageList': MESSAGE_LIST,
 };
@@ -79,16 +110,56 @@ describe('row security', () => {
   });
 
   it('restricts authored objects by createdBy', () => {
-    assert.match(call(NOTE).sql, /"createdByWorkspaceMemberId" = :/);
+    assert.match(call(MESSAGE_LIST).sql, /"createdByWorkspaceMemberId" = :/);
   });
 
-  it('lets join rows through their parent record', () => {
+  it('shows a note the member wrote OR one filed against their record', () => {
+    const { sql } = call(NOTE, { alias: 'n' });
+
+    // Every prod note is written by an integration, so the creator branch alone
+    // would hide the lead note sitting on the member's own contact.
+    assert.match(sql, /"n"\."createdByWorkspaceMemberId" = :/);
+    assert.match(sql, /EXISTS \(SELECT 1 FROM "workspace_test"\."noteTarget"/);
+    assert.match(sql, /"personOwnerId" = :pinionRowSecurityMemberId/);
+    assert.match(sql, / OR /);
+  });
+
+  it('reaches a link row through the record it points at, not its note', () => {
     const { sql } = call(NOTE_TARGET);
 
-    // noteTarget links to people through a MORPH relation we cannot follow, so
-    // visibility comes from the note it belongs to.
-    assert.match(sql, /EXISTS \(SELECT 1 FROM "workspace_test"\."note"/);
-    assert.match(sql, /"createdByWorkspaceMemberId" = :/);
+    // Reaching it through the note would be circular: the note is itself
+    // reached through this row.
+    assert.match(sql, /EXISTS \(SELECT 1 FROM "workspace_test"\."person"/);
+    assert.doesNotMatch(sql, /FROM "workspace_test"\."note"/);
+  });
+
+  it('shows a company the member has a contact at', () => {
+    const { sql } = call(COMPANY, { alias: 'c' });
+
+    assert.match(sql, /"c"\."accountOwnerId" = :/);
+    assert.match(sql, /EXISTS \(SELECT 1 FROM "workspace_test"\."person"/);
+    assert.match(sql, /"companyId" = "c"\."id"/);
+  });
+
+  it('denies a linked rule whose collection relation is gone', () => {
+    const renamed = shape({ name: 'note', columns: ['createdByWorkspaceMemberId'] });
+
+    // No noteTargets relation, so only the creator branch survives.
+    const { sql } = call(renamed, { alias: 'n' });
+
+    assert.match(sql, /"n"\."createdByWorkspaceMemberId" = :/);
+    assert.doesNotMatch(sql, /EXISTS/);
+  });
+
+  it('denies a linked rule whose child lost its back-reference', () => {
+    const detached = shape({
+      name: 'note',
+      relations: { noteTargets: { targetObjectMetadataId: 'id-messageList' } },
+    });
+
+    // Neither branch resolves: no createdBy column, and the child cannot point
+    // back at us. Fail closed rather than emit a cross join.
+    assert.equal(call(detached).sql, DENY_ALL.sql);
   });
 
   it('ORs every readable parent for multi-parent joins', () => {

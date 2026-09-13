@@ -75,10 +75,86 @@ const creatorColumn = ({ tableShape }) =>
     ? 'createdByWorkspaceMemberId'
     : undefined;
 
-// Condition for a row of `tableShape` being readable, addressed through `alias`.
-const conditionForShape = ({ tableShape, alias, tableShapeByObjectMetadataId, depth }) => {
-  const rule = RULES[tableShape.nameSingular];
+const safeLookup = (tableShapeByObjectMetadataId, objectMetadataId) => {
+  try {
+    return tableShapeByObjectMetadataId(objectMetadataId);
+  } catch (error) {
+    return undefined;
+  }
+};
 
+// EXISTS against the parent that `fieldName` points at, e.g. a noteTarget's
+// targetPerson. Returns undefined when the parent is unreachable or unreadable.
+const parentExists = ({ tableShape, alias, fieldName, tableShapeByObjectMetadataId, depth }) => {
+  const relation = (tableShape.relationShapeByFieldName || {})[fieldName];
+  const joinColumn = relation && relation.joinColumnName;
+
+  if (!joinColumn || !(tableShape.columnNames || []).includes(joinColumn)) {
+    return undefined;
+  }
+
+  const parentShape = safeLookup(tableShapeByObjectMetadataId, relation.targetObjectMetadataId);
+
+  if (!parentShape) {
+    return undefined;
+  }
+
+  const parentAlias = `pinion_${tableShape.nameSingular}_${fieldName}`;
+  const parentCondition = conditionForShape({
+    tableShape: parentShape,
+    alias: parentAlias,
+    tableShapeByObjectMetadataId,
+    depth: depth + 1,
+  });
+
+  if (parentCondition === DENY_ALL.sql) {
+    return undefined;
+  }
+
+  const where = [
+    `${quote(parentAlias)}."id" = ${quote(alias)}.${quote(joinColumn)}`,
+    parentCondition,
+  ]
+    .filter(Boolean)
+    .join(' AND ');
+
+  return `EXISTS (SELECT 1 FROM ${quote(parentShape.schemaName)}.${quote(
+    parentShape.tableName,
+  )} ${quote(parentAlias)} WHERE ${where})`;
+};
+
+// The column on `childShape` that points back at `tableShape`.
+const backReferenceColumn = ({ tableShape, childShape, relation }) => {
+  const childRelations = Object.values(childShape.relationShapeByFieldName || {});
+  const byFieldId = childRelations.find(
+    (candidate) =>
+      relation.targetFieldMetadataId &&
+      candidate.fieldMetadataId === relation.targetFieldMetadataId &&
+      candidate.joinColumnName,
+  );
+  const match =
+    byFieldId ||
+    childRelations.find(
+      (candidate) =>
+        candidate.targetObjectMetadataId === tableShape.objectMetadataId &&
+        candidate.joinColumnName,
+    );
+  const column = match && match.joinColumnName;
+
+  return column && (childShape.columnNames || []).includes(column) ? column : undefined;
+};
+
+// Condition for a row of `tableShape` being readable, addressed through `alias`.
+const conditionForShape = ({ tableShape, alias, tableShapeByObjectMetadataId, depth }) =>
+  conditionForRule({
+    rule: RULES[tableShape.nameSingular],
+    tableShape,
+    alias,
+    tableShapeByObjectMetadataId,
+    depth,
+  });
+
+const conditionForRule = ({ rule, tableShape, alias, tableShapeByObjectMetadataId, depth }) => {
   if (!rule || rule.mode === 'hidden') {
     return DENY_ALL.sql;
   }
@@ -110,52 +186,106 @@ const conditionForShape = ({ tableShape, alias, tableShapeByObjectMetadataId, de
       return DENY_ALL.sql;
     }
 
-    const branches = [];
+    const branches = rule.fieldNames
+      .map((fieldName) =>
+        parentExists({ tableShape, alias, fieldName, tableShapeByObjectMetadataId, depth }),
+      )
+      .filter(Boolean);
 
-    for (const fieldName of rule.fieldNames) {
-      const relation = (tableShape.relationShapeByFieldName || {})[fieldName];
-      const joinColumn = relation && relation.joinColumnName;
+    return branches.length > 0 ? `(${branches.join(' OR ')})` : DENY_ALL.sql;
+  }
 
-      if (!joinColumn || !(tableShape.columnNames || []).includes(joinColumn)) {
-        continue;
-      }
+  // "Attached to something the member may read": walk down to a child
+  // collection, then back up to the record it hangs off. This is what keeps a
+  // lead note written by an integration visible on the AM's own contact.
+  if (rule.mode === 'linked') {
+    if (depth > 0) {
+      return DENY_ALL.sql;
+    }
 
-      let parentShape;
+    const relation = (tableShape.relationShapeByFieldName || {})[rule.collectionFieldName];
 
-      try {
-        parentShape = tableShapeByObjectMetadataId(relation.targetObjectMetadataId);
-      } catch (error) {
-        parentShape = undefined;
-      }
+    if (!relation) {
+      return DENY_ALL.sql;
+    }
 
-      if (!parentShape) {
-        continue;
-      }
+    const childShape = safeLookup(tableShapeByObjectMetadataId, relation.targetObjectMetadataId);
 
-      const parentAlias = `pinion_${tableShape.nameSingular}_${fieldName}`;
-      const parentCondition = conditionForShape({
-        tableShape: parentShape,
-        alias: parentAlias,
+    if (!childShape) {
+      return DENY_ALL.sql;
+    }
+
+    const backColumn = backReferenceColumn({ tableShape, childShape, relation });
+
+    if (!backColumn) {
+      return DENY_ALL.sql;
+    }
+
+    const childAlias = `pinion_${tableShape.nameSingular}_${rule.collectionFieldName}`;
+    let inner;
+
+    if (rule.targetFieldNames.length === 0) {
+      // The child carries its own ownership (a company's people, say).
+      inner = conditionForShape({
+        tableShape: childShape,
+        alias: childAlias,
         tableShapeByObjectMetadataId,
         depth: depth + 1,
       });
 
-      if (parentCondition === DENY_ALL.sql) {
-        continue;
+      if (inner === DENY_ALL.sql) {
+        return DENY_ALL.sql;
+      }
+    } else {
+      // The child is a join table: follow its target columns to a readable row.
+      const branches = rule.targetFieldNames
+        .map((fieldName) =>
+          parentExists({
+            tableShape: childShape,
+            alias: childAlias,
+            fieldName,
+            tableShapeByObjectMetadataId,
+            depth,
+          }),
+        )
+        .filter(Boolean);
+
+      if (branches.length === 0) {
+        return DENY_ALL.sql;
       }
 
-      const where = [
-        `${quote(parentAlias)}."id" = ${quote(alias)}.${quote(joinColumn)}`,
-        parentCondition,
-      ]
-        .filter(Boolean)
-        .join(' AND ');
+      inner = `(${branches.join(' OR ')})`;
+    }
 
-      branches.push(
-        `EXISTS (SELECT 1 FROM ${quote(parentShape.schemaName)}.${quote(
-          parentShape.tableName,
-        )} ${quote(parentAlias)} WHERE ${where})`,
-      );
+    const where = [`${quote(childAlias)}.${quote(backColumn)} = ${quote(alias)}."id"`, inner]
+      .filter(Boolean)
+      .join(' AND ');
+
+    return `EXISTS (SELECT 1 FROM ${quote(childShape.schemaName)}.${quote(
+      childShape.tableName,
+    )} ${quote(childAlias)} WHERE ${where})`;
+  }
+
+  if (rule.mode === 'anyOf') {
+    const branches = [];
+
+    for (const branchRule of rule.rules) {
+      const branch = conditionForRule({
+        rule: branchRule,
+        tableShape,
+        alias,
+        tableShapeByObjectMetadataId,
+        depth,
+      });
+
+      // One unrestricted branch makes the whole object unrestricted.
+      if (branch === undefined) {
+        return undefined;
+      }
+
+      if (branch !== DENY_ALL.sql) {
+        branches.push(branch);
+      }
     }
 
     return branches.length > 0 ? `(${branches.join(' OR ')})` : DENY_ALL.sql;
