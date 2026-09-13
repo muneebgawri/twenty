@@ -2204,31 +2204,6 @@ export const STANDARD_OBJECTS = {
           },
         },
       },
-      personalLeads: {
-        universalIdentifier: '4e690b1e-4341-4f35-8f65-f9ac943ec723',
-        viewFields: {
-          name: {
-            universalIdentifier: '31105874-649a-4387-b39f-21f000de35bf',
-          },
-          emails: {
-            universalIdentifier: 'ba574293-e8f9-4c5e-85c3-170ce6efa09d',
-          },
-          company: {
-            universalIdentifier: 'b96ea353-2870-4099-88db-30afb96b29e6',
-          },
-          phones: {
-            universalIdentifier: 'e5d218f4-94bf-4686-b675-f7e84201e316',
-          },
-          createdAt: {
-            universalIdentifier: 'c4efe247-87e8-4792-9442-3fa99412d300',
-          },
-        },
-        viewFilters: {
-          createdByMe: {
-            universalIdentifier: '20b1f1d2-032c-4f12-a3ab-c35695d531a4',
-          },
-        },
-      },
       personRecordPageFields: {
         universalIdentifier: '20202020-a002-4a02-8a02-ae0a1ea12001',
         viewFieldGroups: {
