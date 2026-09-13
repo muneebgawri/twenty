@@ -74,6 +74,14 @@ const LIST_MEMBER = shape({
     person: { joinColumnName: 'personId', targetObjectMetadataId: 'id-person' },
   },
 });
+const TIMELINE_ACTIVITY = shape({
+  name: 'timelineActivity',
+  columns: ['workspaceMemberId', 'targetPersonId'],
+  relations: {
+    workspaceMember: { joinColumnName: 'workspaceMemberId', targetObjectMetadataId: 'id-workspaceMember' },
+    targetPerson: { joinColumnName: 'targetPersonId', targetObjectMetadataId: 'id-person' },
+  },
+});
 const MESSAGE = shape({
   name: 'message',
   columns: ['messageThreadId'],
@@ -241,6 +249,17 @@ describe('row security', () => {
     // through these rows.
     assert.match(sql, /EXISTS \(SELECT 1 FROM "workspace_test"\."person"/);
     assert.doesNotMatch(sql, /FROM "workspace_test"\."messageThread"/);
+  });
+
+  it('shows activity the member performed OR activity about their records', () => {
+    const { sql } = call(TIMELINE_ACTIVITY, { alias: 'ta' });
+
+    // Keyed only on who acted, an AM saw nothing: on prod just 4,091 of
+    // 405,581 rows carry a workspace member.
+    assert.match(sql, /"ta"\."workspaceMemberId" = :pinionRowSecurityMemberId/);
+    assert.match(sql, /EXISTS \(SELECT 1 FROM "workspace_test"\."person"/);
+    assert.match(sql, /"personOwnerId" = :pinionRowSecurityMemberId/);
+    assert.match(sql, / OR /);
   });
 
   it('still hides calendar contents', () => {

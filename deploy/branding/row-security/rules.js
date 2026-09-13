@@ -56,7 +56,15 @@ const RULES = {
   opportunity: ANY_OF(OWN('owner'), VIA('pointOfContact')),
   task: ANY_OF(OWN('assignee'), LINKED('taskTargets', ...RECORD_TARGETS)),
   blocklist: OWN('workspaceMember'),
-  timelineActivity: OWN('workspaceMember'),
+
+  // The activity feed on a record page. Keyed on who performed the action, it
+  // showed an Account Manager nothing at all: of 405,581 rows on prod only
+  // 4,091 carry a workspace member, because the integrations and the system do
+  // almost all of the writing. An activity is about a record, so it is read
+  // through the record — the member sees the history of their own contacts,
+  // plus anything they did themselves.
+  timelineActivity: ANY_OF(OWN('workspaceMember'), VIA(...RECORD_TARGETS)),
+
   calendarEventParticipant: OWN('workspaceMember'),
   messageParticipant: OWN('workspaceMember'),
 
