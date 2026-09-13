@@ -2,10 +2,11 @@ import { Injectable } from '@nestjs/common';
 
 import { UserVarsService } from 'src/engine/core-modules/user/user-vars/services/user-vars.service';
 import {
+  buildEmailSignatureKey,
   EMAIL_SIGNATURE_MAX_LENGTH,
-  EmailSignatureKeys,
   type EmailSignatureKeyValueType,
   type EmailSignaturesByConnectedAccountId,
+  parseEmailSignatureKey,
 } from 'src/modules/messaging/message-outbound-manager/types/email-signature-key-value.type';
 
 @Injectable()
@@ -22,14 +23,29 @@ export class EmailSignatureService {
     userId: string;
     workspaceId: string;
   }): Promise<EmailSignaturesByConnectedAccountId> {
-    const stored = await this.userVarsService.get({
+    const userVars = await this.userVarsService.getAll({
       userId,
       workspaceId,
-      key: EmailSignatureKeys.EMAIL_SIGNATURES,
     });
 
-    // A user who has never saved one has no row at all.
-    return stored ?? {};
+    const signatures: EmailSignaturesByConnectedAccountId = {};
+
+    for (const [key, value] of userVars) {
+      const connectedAccountId = parseEmailSignatureKey(key);
+
+      // getAll returns every user variable, not only ours.
+      if (connectedAccountId === undefined || typeof value !== 'string') {
+        continue;
+      }
+
+      const signature = value.trim();
+
+      if (signature) {
+        signatures[connectedAccountId] = signature;
+      }
+    }
+
+    return signatures;
   }
 
   /**
@@ -49,8 +65,13 @@ export class EmailSignatureService {
     workspaceId: string;
     connectedAccountId: string;
   }): Promise<string | undefined> {
-    const signatures = await this.getForUser({ userId, workspaceId });
-    const signature = signatures[connectedAccountId]?.trim();
+    const stored = await this.userVarsService.get({
+      userId,
+      workspaceId,
+      key: buildEmailSignatureKey(connectedAccountId),
+    });
+
+    const signature = stored?.trim();
 
     return signature ? signature : undefined;
   }
@@ -59,6 +80,9 @@ export class EmailSignatureService {
    * Save (or clear, by passing an empty string) the signature for one account.
    * Returns the full map so a caller can render every account without a second
    * round trip.
+   *
+   * Writes only this account's row. Reading the whole map first and writing it
+   * back would let a concurrent save of a different account be overwritten.
    */
   async setForConnectedAccount({
     userId,
@@ -79,23 +103,21 @@ export class EmailSignatureService {
       );
     }
 
-    const signatures = await this.getForUser({ userId, workspaceId });
+    const key = buildEmailSignatureKey(connectedAccountId);
 
     if (trimmed) {
-      signatures[connectedAccountId] = trimmed;
+      await this.userVarsService.set({
+        userId,
+        workspaceId,
+        key,
+        value: trimmed,
+      });
     } else {
-      // Clearing removes the entry rather than storing "", so an account with no
+      // Clearing removes the row rather than storing "", so an account with no
       // signature reads the same whether it was never set or was emptied.
-      delete signatures[connectedAccountId];
+      await this.userVarsService.delete({ userId, workspaceId, key });
     }
 
-    await this.userVarsService.set({
-      userId,
-      workspaceId,
-      key: EmailSignatureKeys.EMAIL_SIGNATURES,
-      value: signatures,
-    });
-
-    return signatures;
+    return await this.getForUser({ userId, workspaceId });
   }
 }
