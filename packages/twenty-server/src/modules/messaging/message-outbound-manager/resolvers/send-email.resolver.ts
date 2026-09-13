@@ -1,5 +1,6 @@
 import {
   ForbiddenException,
+  HttpException,
   Logger,
   UseFilters,
   UseGuards,
@@ -27,6 +28,20 @@ import {
   type ScheduledEmailJobData,
 } from 'src/modules/messaging/message-outbound-manager/jobs/scheduled-email.job';
 import { OutboundEmailDispatchService } from 'src/modules/messaging/message-outbound-manager/services/outbound-email-dispatch.service';
+
+/**
+ * Floor on a scheduled send. Below this the job would fire while the user is
+ * still looking at the composer, which reads as "it sent immediately" and makes
+ * the schedule pointless.
+ */
+export const MINIMUM_SCHEDULE_DELAY_MS = 30_000;
+
+/**
+ * Ceiling on a scheduled send. Without one, a mistyped year parks a job in Redis
+ * for decades — it outlives the queue, the credentials it will send with, and
+ * usually the person who scheduled it.
+ */
+export const MAXIMUM_SCHEDULE_DELAY_MS = 365 * 24 * 60 * 60 * 1000;
 
 @MetadataResolver()
 @UsePipes(ResolverValidationPipe)
@@ -58,10 +73,17 @@ export class SendEmailResolver {
 
         const delay = scheduledAt.getTime() - Date.now();
 
-        if (delay < 30_000) {
+        if (delay < MINIMUM_SCHEDULE_DELAY_MS) {
           return {
             success: false,
             error: 'Scheduled time must be at least 30 seconds in the future',
+          };
+        }
+
+        if (delay > MAXIMUM_SCHEDULE_DELAY_MS) {
+          return {
+            success: false,
+            error: 'Scheduled time must be within one year',
           };
         }
 
@@ -100,12 +122,20 @@ export class SendEmailResolver {
         throw error;
       }
 
-      this.logger.error(`Failed to send email: ${error}`);
+      // A thrown HttpException is a deliberate, user-facing failure — "connected
+      // account not found" and the like — so its message is meant for the
+      // caller. Anything else is an internal fault whose text can carry
+      // hostnames, ports and query fragments, so it is logged and generalised.
+      if (error instanceof HttpException) {
+        return { success: false, error: error.message };
+      }
 
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Failed to send email',
-      };
+      this.logger.error(
+        'Failed to send email',
+        error instanceof Error ? error.stack : String(error),
+      );
+
+      return { success: false, error: 'Failed to send email' };
     }
   }
 }

@@ -135,68 +135,6 @@ export const computeStandardPersonViewFields = (
       },
     }),
 
-    // personalLeads view fields
-    personalLeadsName: createStandardViewFieldFlatMetadata({
-      ...args,
-      objectName: 'person',
-      context: {
-        viewName: 'personalLeads',
-        viewFieldName: 'name',
-        fieldName: 'name',
-        position: 0,
-        isVisible: true,
-        size: 210,
-      },
-    }),
-    personalLeadsEmails: createStandardViewFieldFlatMetadata({
-      ...args,
-      objectName: 'person',
-      context: {
-        viewName: 'personalLeads',
-        viewFieldName: 'emails',
-        fieldName: 'emails',
-        position: 1,
-        isVisible: true,
-        size: 180,
-      },
-    }),
-    personalLeadsCompany: createStandardViewFieldFlatMetadata({
-      ...args,
-      objectName: 'person',
-      context: {
-        viewName: 'personalLeads',
-        viewFieldName: 'company',
-        fieldName: 'company',
-        position: 2,
-        isVisible: true,
-        size: 180,
-      },
-    }),
-    personalLeadsPhones: createStandardViewFieldFlatMetadata({
-      ...args,
-      objectName: 'person',
-      context: {
-        viewName: 'personalLeads',
-        viewFieldName: 'phones',
-        fieldName: 'phones',
-        position: 3,
-        isVisible: true,
-        size: 160,
-      },
-    }),
-    personalLeadsCreatedAt: createStandardViewFieldFlatMetadata({
-      ...args,
-      objectName: 'person',
-      context: {
-        viewName: 'personalLeads',
-        viewFieldName: 'createdAt',
-        fieldName: 'createdAt',
-        position: 4,
-        isVisible: true,
-        size: 150,
-      },
-    }),
-
     // personRecordPageFields view fields
     // General group
     personRecordPageFieldsEmails: createStandardViewFieldFlatMetadata({
