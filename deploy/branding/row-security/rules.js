@@ -95,14 +95,25 @@ const RULES = {
   // Needed to render owner/assignee names and pickers.
   workspaceMember: VISIBLE,
 
-  // --- mailbox and calendar contents --------------------------------------
-  // Hidden outright: these carry other people's correspondence and have no
-  // ownership column of their own. Sync has been off since 2026-09-09 anyway.
-  message: HIDDEN,
-  messageThread: HIDDEN,
+  // --- mailbox contents ----------------------------------------------------
+  // A message is readable only when the member is a participant on it — their
+  // own correspondence, which they can already read in their mailbox. This is
+  // also what makes the open and click counts on a sent message visible to the
+  // person who sent it. Participants are matched to a workspace member by
+  // handle, so a message nobody here took part in stays hidden.
+  message: LINKED('messageParticipants'),
+
+  // A thread is readable when it is filed against a record the member owns —
+  // the email history on their own contact. Reaching it through its messages
+  // instead would be circular, since a message is reached through its
+  // participants.
+  messageThread: LINKED('messageThreadTargets', ...RECORD_TARGETS),
+  messageThreadTarget: VIA(...RECORD_TARGETS),
+
+  // --- calendar contents ---------------------------------------------------
+  // Still hidden: no ownership column, and nothing has asked for it.
   calendarEvent: HIDDEN,
   calendarEventTarget: HIDDEN,
-  messageThreadTarget: HIDDEN,
   calendarChannelEventAssociation: HIDDEN,
   messageChannelMessageAssociation: HIDDEN,
   messageChannelMessageAssociationMessageFolder: HIDDEN,

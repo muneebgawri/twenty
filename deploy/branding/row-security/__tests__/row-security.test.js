@@ -74,7 +74,52 @@ const LIST_MEMBER = shape({
     person: { joinColumnName: 'personId', targetObjectMetadataId: 'id-person' },
   },
 });
-const MESSAGE = shape({ name: 'message', columns: ['text'] });
+const MESSAGE = shape({
+  name: 'message',
+  columns: ['messageThreadId'],
+  relations: {
+    messageParticipants: {
+      targetObjectMetadataId: 'id-messageParticipant',
+      targetFieldMetadataId: 'field-messageParticipant-message',
+    },
+  },
+});
+const MESSAGE_PARTICIPANT = shape({
+  name: 'messageParticipant',
+  columns: ['messageId', 'workspaceMemberId'],
+  relations: {
+    message: {
+      fieldMetadataId: 'field-messageParticipant-message',
+      joinColumnName: 'messageId',
+      targetObjectMetadataId: 'id-message',
+    },
+    workspaceMember: {
+      joinColumnName: 'workspaceMemberId',
+      targetObjectMetadataId: 'id-workspaceMember',
+    },
+  },
+});
+const MESSAGE_THREAD = shape({
+  name: 'messageThread',
+  relations: {
+    messageThreadTargets: {
+      targetObjectMetadataId: 'id-messageThreadTarget',
+      targetFieldMetadataId: 'field-messageThreadTarget-thread',
+    },
+  },
+});
+const MESSAGE_THREAD_TARGET = shape({
+  name: 'messageThreadTarget',
+  columns: ['messageThreadId', 'targetPersonId'],
+  relations: {
+    messageThread: {
+      fieldMetadataId: 'field-messageThreadTarget-thread',
+      joinColumnName: 'messageThreadId',
+      targetObjectMetadataId: 'id-messageThread',
+    },
+    targetPerson: { joinColumnName: 'targetPersonId', targetObjectMetadataId: 'id-person' },
+  },
+});
 const MEMBER_SHAPE = shape({ name: 'workspaceMember', columns: ['name'] });
 const UNKNOWN = shape({ name: 'somethingUpstreamAdded', columns: ['secret'] });
 
@@ -84,6 +129,8 @@ const SHAPES = {
   'id-noteTarget': NOTE_TARGET,
   'id-company': COMPANY,
   'id-workspaceMember': MEMBER_SHAPE,
+  'id-messageParticipant': MESSAGE_PARTICIPANT,
+  'id-messageThreadTarget': MESSAGE_THREAD_TARGET,
   'id-messageList': MESSAGE_LIST,
 };
 const lookup = (id) => SHAPES[id];
@@ -170,8 +217,34 @@ describe('row security', () => {
     assert.match(sql, / OR /);
   });
 
-  it('hides mailbox objects', () => {
-    assert.equal(call(MESSAGE).sql, DENY_ALL.sql);
+  it('shows a message the member took part in', () => {
+    const { sql } = call(MESSAGE, { alias: 'm' });
+
+    // Their own correspondence, which is also what makes the open and click
+    // counts on a message they sent visible to them.
+    assert.match(sql, /EXISTS \(SELECT 1 FROM "workspace_test"\."messageParticipant"/);
+    assert.match(sql, /"workspaceMemberId" = :pinionRowSecurityMemberId/);
+    assert.match(sql, /"messageId" = "m"\."id"/);
+  });
+
+  it('shows a thread filed against a record the member owns', () => {
+    const { sql } = call(MESSAGE_THREAD, { alias: 't' });
+
+    assert.match(sql, /EXISTS \(SELECT 1 FROM "workspace_test"\."messageThreadTarget"/);
+    assert.match(sql, /"personOwnerId" = :pinionRowSecurityMemberId/);
+  });
+
+  it('reaches a thread target through its record, not its thread', () => {
+    const { sql } = call(MESSAGE_THREAD_TARGET);
+
+    // Reaching it through the thread would be circular: the thread is reached
+    // through these rows.
+    assert.match(sql, /EXISTS \(SELECT 1 FROM "workspace_test"\."person"/);
+    assert.doesNotMatch(sql, /FROM "workspace_test"\."messageThread"/);
+  });
+
+  it('still hides calendar contents', () => {
+    assert.equal(call(shape({ name: 'calendarEvent', columns: ['title'] })).sql, DENY_ALL.sql);
   });
 
   it('leaves workspace members visible', () => {
