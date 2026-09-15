@@ -56,3 +56,51 @@ signed out once.
 - **Verify before and after with a schema check.** Validating the GraphQL
   operations another service sends (Herald) against the old and new schemas
   catches renamed or removed fields without touching production.
+
+## Deploys: why a slow boot looked like a broken image (2026-09-15)
+
+An overlay-only revision (`pinion.6` → `pinion.7`, same Twenty version) took
+crm.pinionpartners.co down for about ten minutes. Nothing was wrong with the
+image.
+
+**What happens on every `docker compose up --force-recreate`:** the container
+entrypoint runs `cache:flush` → `command:prod upgrade` → `cache:flush` →
+`cron:register:all` *before* the server binds `:3000`. On this database that is
+5+ minutes of 502s. Each step spawns its own Node process, so the logs go quiet
+and the container reports `Running=true, ExitCode=0, Restarts=0` throughout —
+indistinguishable from healthy at a glance, and indistinguishable from wedged.
+
+**Why it read as a failure:** the compose healthcheck was `interval: 5s,
+retries: 20` — a 100-second budget. Boot blew through it, the container was
+marked `unhealthy`, the worker's `depends_on` gave up, and `docker compose up`
+exited with `dependency failed to start: container twenty-server-1 is
+unhealthy`. That message describes a crash. This was not a crash.
+
+**What made it worse:** rolling back. The rollback recreates the container,
+which restarts the same boot cycle, paying the outage a second time. The
+rollback "failing" the same way is in fact the clearest evidence the image is
+*not* the problem — if a known-good tag fails identically, look at the
+environment, not the artifact.
+
+Three fixes, all in place:
+
+1. `start_period: 600s` on the server healthcheck in
+   `/opt/twenty/docker-compose.yml`. Failures inside that window no longer
+   count, so a migrating boot is not reported as unhealthy. **This file lives
+   only on the VPS** — re-apply it if the compose file is ever replaced.
+2. `build-and-deploy.sh` no longer relies on compose's gate. It starts the
+   server alone, polls `/healthz` itself for up to `READY_DEADLINE` (900s),
+   prints which entrypoint step is running each time it checks, and starts the
+   worker only once the server answers. If the deadline passes it rolls back to
+   the previous TAG automatically and says so.
+3. `build-and-deploy.sh` skips the migration cycle for overlay-only revisions
+   (`DISABLE_DB_MIGRATIONS=true` when the base Twenty version is unchanged), so
+   a branding or row-security change restarts in seconds. A version bump still
+   runs the full cycle and warns that it will. The flag is reset to `false` on
+   exit, so an interrupted run cannot leave migrations disabled for the next
+   upgrade.
+
+**Rule of thumb:** before concluding a deploy failed, run
+`docker compose exec server ps -o args` and look for
+`dist/command/command <step>`. If a step is running, it is working, and
+recreating the container only restarts the clock.

@@ -39,27 +39,122 @@ echo "Pinion CRM references in email bundle (should be > 10):"
 docker run --rm --entrypoint /bin/sh "${PINION_TAG}" \
   -c 'grep -c "Pinion CRM" /app/packages/twenty-emails/dist/index.mjs' || true
 
-echo
-echo "=== Updating /opt/twenty/.env TAG → ${PINION_SUFFIX} ==="
 ENV_FILE=/opt/twenty/.env
-if sudo grep -qE "^TAG=${PINION_SUFFIX}\$" "${ENV_FILE}"; then
-  echo "  TAG already set to ${PINION_SUFFIX}, no edit needed"
+PREV_TAG="$(sudo grep -E '^TAG=' "${ENV_FILE}" | cut -d= -f2-)"
+PREV_BASE="${PREV_TAG%%-pinion*}"
+
+# ---------------------------------------------------------------------------
+# Does this deploy need Twenty's migration cycle?
+#
+# The entrypoint runs cache:flush -> upgrade -> cache:flush -> cron:register
+# BEFORE the server binds :3000. On this database that is 5+ minutes during
+# which the site returns 502. An overlay-only revision (same Twenty version,
+# new -pinion.N) changes no schema and no workspace metadata, so that cycle is
+# pure downtime for nothing. A version bump genuinely needs it.
+#
+# 2026-09-15: this cost a real outage. pinion.7 was an overlay-only change, ran
+# the full cycle, tripped the compose health gate, and was misread as a broken
+# image — the rollback then paid the same 5 minutes over again.
+# ---------------------------------------------------------------------------
+if [ "${TWENTY_VERSION}" = "${PREV_BASE}" ]; then
+  MIGRATIONS="skip"
+  echo "=== Overlay-only deploy (${PREV_TAG} -> ${PINION_SUFFIX}, same ${TWENTY_VERSION}) ==="
+  echo "    Skipping the migration cycle: restart is seconds, not minutes."
 else
-  sudo cp "${ENV_FILE}" "${ENV_FILE}.pre-pinion-$(date -u +%Y%m%dT%H%M%SZ)"
-  sudo sed -i -E "s|^TAG=.*|TAG=${PINION_SUFFIX}|" "${ENV_FILE}"
-  echo "  updated; backup saved as ${ENV_FILE}.pre-pinion-*"
-  echo "  new TAG line:"
-  sudo grep "^TAG=" "${ENV_FILE}"
+  MIGRATIONS="run"
+  echo "=== VERSION BUMP: ${PREV_BASE} -> ${TWENTY_VERSION} ==="
+  echo "    Running the full migration cycle. EXPECT 5+ MINUTES OF 502s."
+  echo "    Read deploy/UPGRADE.md first if you have not."
+fi
+
+# The resting value must always be false, so a later run that needs migrations
+# gets them even if this one is interrupted.
+restore_migrations_flag() {
+  sudo sed -i -E "s|^DISABLE_DB_MIGRATIONS=.*|DISABLE_DB_MIGRATIONS=false|" "${ENV_FILE}" || true
+}
+trap restore_migrations_flag EXIT
+
+set_env_var() {
+  local key="$1" value="$2"
+  if sudo grep -qE "^${key}=" "${ENV_FILE}"; then
+    sudo sed -i -E "s|^${key}=.*|${key}=${value}|" "${ENV_FILE}"
+  else
+    echo "${key}=${value}" | sudo tee -a "${ENV_FILE}" >/dev/null
+  fi
+}
+
+echo
+echo "=== Updating ${ENV_FILE} TAG → ${PINION_SUFFIX} ==="
+sudo cp "${ENV_FILE}" "${ENV_FILE}.pre-pinion-$(date -u +%Y%m%dT%H%M%SZ)"
+set_env_var TAG "${PINION_SUFFIX}"
+[ "${MIGRATIONS}" = "skip" ] && set_env_var DISABLE_DB_MIGRATIONS true
+sudo grep -E '^(TAG|DISABLE_DB_MIGRATIONS)=' "${ENV_FILE}" | sed 's/^/  /'
+
+# ---------------------------------------------------------------------------
+# Wait for the server to actually serve, and say what it is doing while we wait.
+#
+# Compose's own gate is `retries: 20` at 5s = 100 seconds, far short of a
+# migrating boot, so `docker compose up` reports "dependency failed to start"
+# on a deploy that is merely slow. We do not use it: the server is brought up
+# alone, polled here, and the worker started only once the server answers.
+# ---------------------------------------------------------------------------
+READY_DEADLINE="${READY_DEADLINE:-900}"
+
+wait_for_server() {
+  local waited=0
+  while [ "${waited}" -lt "${READY_DEADLINE}" ]; do
+    if docker compose exec -T server curl -sf -m 5 http://localhost:3000/healthz >/dev/null 2>&1; then
+      echo "  server answering /healthz after ${waited}s"
+      return 0
+    fi
+    # Not ready. Say which entrypoint step is running so a human can tell
+    # "working through migrations" from "wedged".
+    local step
+    step="$(docker compose exec -T server ps -o args 2>/dev/null \
+            | grep -oE 'dist/command/command [a-z:]+' | head -1 | awk '{print $2}')"
+    echo "  [${waited}s/${READY_DEADLINE}s] not ready${step:+ — running ${step}}"
+    sleep 15
+    waited=$((waited + 15))
+  done
+  return 1
+}
+
+echo
+echo "=== Starting server on ${PINION_SUFFIX} ==="
+cd /opt/twenty
+docker compose up -d --force-recreate --no-deps server
+
+if wait_for_server; then
+  echo
+  echo "=== Server healthy — starting worker ==="
+  docker compose up -d --force-recreate --no-deps worker
+else
+  echo
+  echo "!!! Server did not answer /healthz within ${READY_DEADLINE}s — ROLLING BACK to ${PREV_TAG}"
+  set_env_var TAG "${PREV_TAG}"
+  restore_migrations_flag
+  docker compose up -d --force-recreate --no-deps server
+  if wait_for_server; then
+    echo "!!! Rolled back to ${PREV_TAG}; service restored. ${PINION_SUFFIX} left on disk to debug."
+  else
+    echo "!!! ROLLBACK ALSO FAILED. The problem is NOT the image — check db/redis and"
+    echo "!!! 'docker compose logs server'. Do not keep recreating: each recreate"
+    echo "!!! restarts the boot cycle and extends the outage."
+  fi
+  exit 1
 fi
 
 echo
-echo "=== Restarting server + worker with new image ==="
-cd /opt/twenty
-docker compose up -d --force-recreate --no-deps server worker
+echo "=== Verifying the running container ==="
+docker compose exec -T server sh -c 'node -e "require(\"/app/pinion-row-security/rules\");console.log(\"  row-security rules load OK\")"' || {
+  echo "  !!! row-security module failed to load — restricted roles would silently lose their filter"
+  exit 1
+}
+docker inspect "$(docker compose ps -q server)" \
+  --format '  overlay-stage={{index .Config.Labels "co.pinion.branding-stage"}}'
+curl -s -o /dev/null -w '  public https %{http_code}\n' -m 20 https://crm.pinionpartners.co/
 
 echo
-echo "=== Done. Wait ~3 minutes for Twenty's first-boot cycle, then verify: ==="
+echo "=== Done. Still worth an eyeball: ==="
 echo "  - browser tab title should read 'Pinion CRM' at https://crm.pinionpartners.co"
-echo "  - send a test invite via Twenty UI and confirm email subject + body say 'Pinion CRM'"
-echo "  - check the running image carries the overlay label (expects stage2):"
-echo "      docker inspect \$(docker compose -f ${COMPOSE_FILE} ps -q server) --format '{{index .Config.Labels \"co.pinion.branding-stage\"}}'"
+echo "  - send a test invite and confirm the email says 'Pinion CRM'"
