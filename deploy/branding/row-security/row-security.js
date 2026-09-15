@@ -179,6 +179,32 @@ const conditionForRule = ({ rule, tableShape, alias, tableShapeByObjectMetadataI
       : DENY_ALL.sql;
   }
 
+  // "Readable because the parent record is readable", evaluating the parent's
+  // OWN rule rather than requiring it to be own/creator the way `via` does.
+  // That is what lets a message participant be reached through its message,
+  // whose rule is itself a `linked`.
+  //
+  // Bounded deliberately: only valid at depth 0, and the parent is evaluated at
+  // depth 0 (parentExists increments), so the worst case is
+  // participant -> message -> participant = two nested EXISTS. The nested
+  // participant sees depth 1 and falls back to its OWN branch, which is what
+  // terminates the recursion.
+  if (rule.mode === 'parent') {
+    if (depth > 0) {
+      return DENY_ALL.sql;
+    }
+
+    const sql = parentExists({
+      tableShape,
+      alias,
+      fieldName: rule.fieldName,
+      tableShapeByObjectMetadataId,
+      depth: -1,
+    });
+
+    return sql || DENY_ALL.sql;
+  }
+
   if (rule.mode === 'via') {
     // One level only: parents are 'own' or 'creator'. Deeper chains would mean
     // correlated subqueries per join, which is not worth the query cost.

@@ -37,6 +37,12 @@ const LINKED = (collectionFieldName, ...targetFieldNames) => ({
   collectionFieldName,
   targetFieldNames,
 });
+// "readable because the record it hangs off is readable". Unlike via(), which
+// requires the parent to be own/creator, parent() evaluates the parent's own
+// rule in full — so it can reach a parent that is itself reached through a
+// child collection. It may only appear at the top level; nested inside another
+// rule it denies, which bounds the recursion at two EXISTS.
+const PARENT = (fieldName) => ({ mode: 'parent', fieldName });
 const ANY_OF = (...rules) => ({ mode: 'anyOf', rules });
 const CREATOR = { mode: 'creator' };
 const VISIBLE = { mode: 'visible' };
@@ -66,7 +72,22 @@ const RULES = {
   timelineActivity: ANY_OF(OWN('workspaceMember'), VIA(...RECORD_TARGETS)),
 
   calendarEventParticipant: OWN('workspaceMember'),
-  messageParticipant: OWN('workspaceMember'),
+
+  // A participant on a message the member may read — which, per the `message`
+  // rule below, means a message they took part in. Their own correspondence,
+  // and both ends of it.
+  //
+  // 2026-09-15: this was OWN('workspaceMember') alone. External participants
+  // carry a handle and no workspace member, so the counterparty on the
+  // member's own email was invisible. The frontend computes
+  // `receivers = participants.filter(role !== 'FROM')` and renders NOTHING for
+  // a message with no receivers (EmailThreadMessage.tsx:62), so an Account
+  // Manager opening their own thread got a blank panel: no error, no loader,
+  // no clue. The bodies were arriving in the response the whole time.
+  //
+  // OWN stays as the first branch so a participant row pointing at the member
+  // is readable even on a message the message-rule would not admit.
+  messageParticipant: ANY_OF(OWN('workspaceMember'), PARENT('message')),
 
   // --- authored by the member, or filed against their records --------------
   note: ANY_OF(CREATOR, LINKED('noteTargets', ...RECORD_TARGETS)),
@@ -148,4 +169,4 @@ const RULES = {
   messageChannelMessageAssociationMessageFolder: HIDDEN,
 };
 
-module.exports = { RULES, OWN, VIA, LINKED, ANY_OF, CREATOR, VISIBLE, HIDDEN };
+module.exports = { RULES, OWN, VIA, LINKED, PARENT, ANY_OF, CREATOR, VISIBLE, HIDDEN };

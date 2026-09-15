@@ -144,6 +144,7 @@ const SHAPES = {
   'id-noteTarget': NOTE_TARGET,
   'id-company': COMPANY,
   'id-workspaceMember': MEMBER_SHAPE,
+  'id-message': MESSAGE,
   'id-messageParticipant': MESSAGE_PARTICIPANT,
   'id-messageThreadTarget': MESSAGE_THREAD_TARGET,
   'id-messageList': MESSAGE_LIST,
@@ -240,6 +241,33 @@ describe('row security', () => {
     assert.match(sql, /EXISTS \(SELECT 1 FROM "workspace_test"\."messageParticipant"/);
     assert.match(sql, /"workspaceMemberId" = :pinionRowSecurityMemberId/);
     assert.match(sql, /"messageId" = "m"\."id"/);
+  });
+
+  it('shows both ends of a message the member took part in', () => {
+    // Regression, 2026-09-15. OWN('workspaceMember') alone hid every external
+    // participant, because they carry a handle and no workspace member. The
+    // frontend renders nothing for a message whose receivers list is empty
+    // (EmailThreadMessage.tsx:62), so an Account Manager opening their own
+    // thread saw a blank panel while the bodies sat in the response.
+    const { sql } = call(MESSAGE_PARTICIPANT, { alias: 'mp' });
+
+    // Own row still readable...
+    assert.match(sql, /"mp"\."workspaceMemberId" = :pinionRowSecurityMemberId/);
+    // ...or reachable through the message, which must itself be one the member
+    // took part in — that inner check is what keeps this from being "all
+    // participants everywhere".
+    assert.match(sql, /EXISTS \(SELECT 1 FROM "workspace_test"\."message"/);
+    assert.match(sql, /EXISTS \(SELECT 1 FROM "workspace_test"\."messageParticipant"/);
+  });
+
+  it('bounds parent() recursion at two levels', () => {
+    // participant -> message -> participant. The innermost participant is
+    // evaluated below the top level, where parent() denies and only the OWN
+    // branch survives; without that guard this recurses forever.
+    const { sql } = call(MESSAGE_PARTICIPANT, { alias: 'mp' });
+    const nested = (sql.match(/EXISTS \(/g) || []).length;
+
+    assert.ok(nested <= 2, `expected at most 2 nested EXISTS, got ${nested}`);
   });
 
   it('lets a member reach the channel association of a message they may read', () => {
