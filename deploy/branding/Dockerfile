@@ -125,6 +125,22 @@ RUN set -eu; \
     node --check "$F"; \
     cd /app/pinion-row-security && node --test
 
+# Separate Google OAuth client for Gmail/Calendar.
+#
+# Twenty reads one AUTH_GOOGLE_CLIENT_ID/SECRET pair for both "Sign in with
+# Google" and the Gmail/Calendar connection, so adding the Gmail scopes to it
+# would put a restricted-scope consent screen in front of every sign-in. This
+# points the four Google APIs call sites — consent, availability check, token
+# refresh and API client — at AUTH_GOOGLE_APIS_CLIENT_ID/SECRET when set, and
+# leaves sign-in on the shared pair. Unset means unchanged behaviour.
+#
+# The build fails if any call site moved, so an upgrade cannot quietly revert
+# to a single client.
+COPY google-apis-oauth /app/pinion-google-apis-oauth
+RUN set -eu; \
+    node /app/pinion-google-apis-oauth/apply-patch.js /app/packages/twenty-server/dist; \
+    cd /app/pinion-google-apis-oauth && node --test
+
 # Marker — Docker image label so we can tell at a glance that the overlay
 # is applied. (Non-root user inside the image can't write to /app, so we
 # use LABEL metadata instead of a marker file.)
