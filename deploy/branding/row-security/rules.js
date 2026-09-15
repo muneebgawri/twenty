@@ -123,12 +123,28 @@ const RULES = {
   messageThread: LINKED('messageThreadTargets', ...RECORD_TARGETS),
   messageThreadTarget: VIA(...RECORD_TARGETS),
 
+  // The link between a message and the mailbox it arrived in. It was filed
+  // under "calendar contents" and hidden, which made every restricted role's
+  // mailbox look empty: Twenty resolves a message's channel through this table
+  // to decide whether the body may be shown, and when that lookup returns no
+  // rows it DROPS the message from the response entirely
+  // (ApplyMessagesVisibilityRestrictionsService). An Account Manager could
+  // therefore read `message` — the rule above admits their own correspondence
+  // — and still see a blank thread, because the row that proves which mailbox
+  // it came from was invisible. Hiding it protected nothing and broke reading.
+  //
+  // VISIBLE rather than VIA('message'): `via` denies at depth > 0, and
+  // `message` is itself a `linked` rule, so routing this through its message
+  // hits that guard and denies. The row carries no customer data — ids, a
+  // direction, and the provider's external message id. Reading a message still
+  // requires passing the `message` rule above.
+  messageChannelMessageAssociation: VISIBLE,
+
   // --- calendar contents ---------------------------------------------------
   // Still hidden: no ownership column, and nothing has asked for it.
   calendarEvent: HIDDEN,
   calendarEventTarget: HIDDEN,
   calendarChannelEventAssociation: HIDDEN,
-  messageChannelMessageAssociation: HIDDEN,
   messageChannelMessageAssociationMessageFolder: HIDDEN,
 };
 

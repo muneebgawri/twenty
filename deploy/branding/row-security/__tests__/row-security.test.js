@@ -107,6 +107,13 @@ const MESSAGE_PARTICIPANT = shape({
     },
   },
 });
+const MESSAGE_CHANNEL_ASSOCIATION = shape({
+  name: 'messageChannelMessageAssociation',
+  columns: ['messageId', 'messageChannelId'],
+  relations: {
+    message: { joinColumnName: 'messageId', targetObjectMetadataId: 'id-message' },
+  },
+});
 const MESSAGE_THREAD = shape({
   name: 'messageThread',
   relations: {
@@ -233,6 +240,27 @@ describe('row security', () => {
     assert.match(sql, /EXISTS \(SELECT 1 FROM "workspace_test"\."messageParticipant"/);
     assert.match(sql, /"workspaceMemberId" = :pinionRowSecurityMemberId/);
     assert.match(sql, /"messageId" = "m"\."id"/);
+  });
+
+  it('lets a member reach the channel association of a message they may read', () => {
+    // Regression, 2026-09-15. This was HIDDEN, filed under "calendar contents".
+    // Twenty resolves a message's channel through this table to decide whether
+    // the body may be shown, and when the lookup comes back empty it drops the
+    // message from the response entirely. The effect was that an Account
+    // Manager passed the `message` rule, opened their own thread, and saw a
+    // blank panel — while an admin saw the mail. Hiding the row protected
+    // nothing: it carries ids and a direction, no customer content.
+    const result = call(MESSAGE_CHANNEL_ASSOCIATION, { alias: 'a' });
+
+    assert.equal(result, undefined, 'the association must not be restricted');
+  });
+
+  it('still requires the message rule to read the message itself', () => {
+    // The association being readable must not widen access to content.
+    const { sql } = call(MESSAGE, { alias: 'm' });
+
+    assert.match(sql, /EXISTS \(SELECT 1 FROM "workspace_test"\."messageParticipant"/);
+    assert.match(sql, /"workspaceMemberId" = :pinionRowSecurityMemberId/);
   });
 
   it('shows a thread filed against a record the member owns', () => {
