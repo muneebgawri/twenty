@@ -53,14 +53,23 @@ const RECORD_TARGETS = ['targetPerson', 'targetCompany', 'targetOpportunity'];
 
 const RULES = {
   // --- owned records -------------------------------------------------------
-  person: OWN('personOwner'),
+  // CREATOR is load-bearing, not a nicety. Twenty's "New Person" button INSERTS
+  // an empty record first and then opens it, and that record has no owner yet.
+  // Without a creator branch the member cannot read the row they just created:
+  // the form fails to load, an error toast appears, and an empty shell is left
+  // behind. 2026-09-16..18 that happened to at least 12 people — Kate 9 times,
+  // Jonah 8, Max 4 — and every one of them simply could not add a contact.
+  //
+  // The same applies to every object with a "New" button, so company,
+  // opportunity and task carry it too. A record you created is yours to see.
+  person: ANY_OF(OWN('personOwner'), CREATOR),
   // Only 13 of 14k companies and 1.7k of 94k opportunities carry an owner, so
   // ownership alone would leave both lists empty. A company the member has a
   // contact at, and an opportunity whose point of contact is theirs, are part
   // of that member's book of business.
-  company: ANY_OF(OWN('accountOwner'), LINKED('people')),
-  opportunity: ANY_OF(OWN('owner'), VIA('pointOfContact')),
-  task: ANY_OF(OWN('assignee'), LINKED('taskTargets', ...RECORD_TARGETS)),
+  company: ANY_OF(OWN('accountOwner'), LINKED('people'), CREATOR),
+  opportunity: ANY_OF(OWN('owner'), VIA('pointOfContact'), CREATOR),
+  task: ANY_OF(OWN('assignee'), LINKED('taskTargets', ...RECORD_TARGETS), CREATOR),
   blocklist: OWN('workspaceMember'),
 
   // The activity feed on a record page. Keyed on who performed the action, it

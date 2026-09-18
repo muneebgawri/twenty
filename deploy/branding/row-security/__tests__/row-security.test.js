@@ -56,12 +56,31 @@ const NOTE_TARGET = shape({
 });
 const COMPANY = shape({
   name: 'company',
-  columns: ['accountOwnerId'],
+  columns: ['accountOwnerId', 'createdByWorkspaceMemberId'],
   relations: {
     accountOwner: { joinColumnName: 'accountOwnerId', targetObjectMetadataId: 'id-workspaceMember' },
     people: {
       targetObjectMetadataId: 'id-person',
       targetFieldMetadataId: 'field-person-company',
+    },
+  },
+});
+const OPPORTUNITY = shape({
+  name: 'opportunity',
+  columns: ['ownerId', 'pointOfContactId', 'createdByWorkspaceMemberId'],
+  relations: {
+    owner: { joinColumnName: 'ownerId', targetObjectMetadataId: 'id-workspaceMember' },
+    pointOfContact: { joinColumnName: 'pointOfContactId', targetObjectMetadataId: 'id-person' },
+  },
+});
+const TASK = shape({
+  name: 'task',
+  columns: ['assigneeId', 'createdByWorkspaceMemberId'],
+  relations: {
+    assignee: { joinColumnName: 'assigneeId', targetObjectMetadataId: 'id-workspaceMember' },
+    taskTargets: {
+      targetObjectMetadataId: 'id-noteTarget',
+      targetFieldMetadataId: 'field-noteTarget-note',
     },
   },
 });
@@ -241,6 +260,25 @@ describe('row security', () => {
     assert.match(sql, /EXISTS \(SELECT 1 FROM "workspace_test"\."messageParticipant"/);
     assert.match(sql, /"workspaceMemberId" = :pinionRowSecurityMemberId/);
     assert.match(sql, /"messageId" = "m"\."id"/);
+  });
+
+  it('lets a member read a record they just created', () => {
+    // Twenty's "New Person" inserts an empty record and then opens it. That
+    // record has no owner yet, so without a creator branch the member cannot
+    // read what they just created: the form fails to load and an empty shell is
+    // orphaned. It happened to 12 people over three days in September 2026.
+    const { sql } = call(PERSON);
+
+    assert.match(sql, /"p"\."personOwnerId" = :pinionRowSecurityMemberId/);
+    assert.match(sql, /"p"\."createdByWorkspaceMemberId" = :pinionRowSecurityMemberId/);
+  });
+
+  it('applies the same creator rule to every object with a New button', () => {
+    for (const shape of [COMPANY, OPPORTUNITY, TASK]) {
+      const { sql } = call(shape, { alias: 'x' });
+      assert.match(sql, /"x"\."createdByWorkspaceMemberId" = :pinionRowSecurityMemberId/,
+        `${shape.nameSingular} must let its creator read it`);
+    }
   });
 
   it('shows both ends of a message the member took part in', () => {
