@@ -138,6 +138,18 @@ const RULES = {
   // Needed to render owner/assignee names and pickers.
   workspaceMember: VISIBLE,
 
+  // "Is this email already assigned, and to whom?" Row-security limits an AM to
+  // the contacts they own, so searching for a colleague's contact returns
+  // nothing — indistinguishable from "nobody has this one", which is the
+  // opposite conclusion and sends two AMs after the same client.
+  //
+  // VISIBLE is safe here because the object is MINIMUM INFORMATION BY
+  // CONSTRUCTION, not by filtering: it holds an email, who owns it, and when it
+  // was refreshed. No name, phone, company or history exists in it to leak, so
+  // nothing depends on a rule correctly hiding a column. Rebuilt hourly from
+  // Person by twenty-crm-hygiene.
+  contactDirectory: VISIBLE,
+
   // --- mailbox contents ----------------------------------------------------
   // A message is readable only when the member is a participant on it — their
   // own correspondence, which they can already read in their mailbox. This is
