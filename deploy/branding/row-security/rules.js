@@ -148,7 +148,12 @@ const RULES = {
   // was refreshed. No name, phone, company or history exists in it to leak, so
   // nothing depends on a rule correctly hiding a column. Rebuilt hourly from
   // Person by twenty-crm-hygiene.
-  contactDirectory: VISIBLE,
+  //
+  // The key is the object's API name, so renaming the object in the UI renames
+  // this key too. Get it wrong and the object is simply absent from this map,
+  // which means HIDDEN — the lookup goes blank for every AM with no error to
+  // explain why.
+  leadLookup: VISIBLE,
 
   // --- mailbox contents ----------------------------------------------------
   // A message is readable only when the member is a participant on it — their
