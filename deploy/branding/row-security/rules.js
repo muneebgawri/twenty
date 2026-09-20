@@ -143,17 +143,31 @@ const RULES = {
   // nothing — indistinguishable from "nobody has this one", which is the
   // opposite conclusion and sends two AMs after the same client.
   //
-  // VISIBLE is safe here because the object is MINIMUM INFORMATION BY
-  // CONSTRUCTION, not by filtering: it holds an email, who owns it, and when it
-  // was refreshed. No name, phone, company or history exists in it to leak, so
-  // nothing depends on a rule correctly hiding a column. Rebuilt hourly from
-  // Person by twenty-crm-hygiene.
+  // The first answer to that was to make the whole directory VISIBLE, on the
+  // reasoning that it is minimum information by construction — an email, an
+  // owner, a timestamp, nothing to leak. That reasoning was about the wrong
+  // unit. Each ROW is harmless; the TABLE is not. 147,683 rows carrying owner
+  // addresses, sortable by owner, is a complete map of every colleague's book —
+  // the shopping list for exactly the behaviour this was meant to discourage.
+  // A browsable index is strictly more power than the question requires.
+  //
+  // So the directory is no longer the interface. It stays as the backing table
+  // for the lookup below and is HIDDEN from restricted roles. Explicit rather
+  // than omitted: an absent key already means hidden, but a reader who finds no
+  // entry cannot tell a deliberate decision from an oversight.
+  leadLookup: HIDDEN,
+
+  // The interface. An AM enters one email, a trigger fills in the answer, and
+  // CREATOR scopes the object to its author so each AM sees only their own
+  // lookups. Same answer as the directory gave, with no index behind it — and
+  // because each lookup is now a record, "who has been checking whose book"
+  // becomes a query rather than a blind spot.
   //
   // The key is the object's API name, so renaming the object in the UI renames
   // this key too. Get it wrong and the object is simply absent from this map,
   // which means HIDDEN — the lookup goes blank for every AM with no error to
   // explain why.
-  leadLookup: VISIBLE,
+  leadLookupRequest: CREATOR,
 
   // --- mailbox contents ----------------------------------------------------
   // A message is readable only when the member is a participant on it — their
