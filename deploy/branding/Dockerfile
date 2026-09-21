@@ -125,6 +125,38 @@ RUN set -eu; \
     node --check "$F"; \
     cd /app/pinion-row-security && node --test
 
+# ---------------------------------------------------------------------------
+# Patch 7 — email deliverability gate
+#
+# Refuses to STORE an address that provably cannot receive mail. An undeliverable
+# address in the CRM is worse than a blank one: it looks like a way to reach
+# someone, it gets exported, it gets loaded into a cold campaign, and the first
+# anyone hears of it is a bounce against a sending domain the whole company shares.
+#
+# It hooks DataArgProcessorService.process(), the one place every write funnels
+# through — GraphQL and REST, create and update, one record and many, standard
+# objects and custom ones — so Person, Journalist and any EMAILS field added later
+# are all covered by one patch. A second patch makes findDuplicates opt out,
+# because that one is a READ: refusing to store an address and refusing to look one
+# up are different things, and Twenty's CSV importer dedupes through it.
+#
+# Only cheap local checks run here — a static disposable-domain list and a cached
+# DNS lookup. Whether a MAILBOX exists needs an SMTP conversation, which has no
+# business on a request a human is waiting on; that verdict arrives asynchronously
+# from Herald and is written to the record rather than gating it.
+#
+# Fails OPEN on every unknown, including a DNS timeout or a bug in the module, and
+# PINION_EMAIL_GATE=off disables it entirely without a rebuild. A CRM that cannot
+# store a contact is a worse outage than the one this prevents.
+COPY email-gate /app/pinion-email-gate
+RUN set -eu; \
+    P=/app/packages/twenty-server/dist/engine/api/common/common-args-processors/data-arg-processor/data-arg-processor.service.js; \
+    D=/app/packages/twenty-server/dist/engine/api/common/common-query-runners/common-find-duplicates-query-runner.service.js; \
+    node /app/pinion-email-gate/apply-patch.js "$P" "$D"; \
+    node --check "$P"; \
+    node --check "$D"; \
+    cd /app/pinion-email-gate && node --test
+
 # Marker — Docker image label so we can tell at a glance that the overlay
 # is applied. (Non-root user inside the image can't write to /app, so we
 # use LABEL metadata instead of a marker file.)
