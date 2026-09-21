@@ -44,6 +44,40 @@ PREV_TAG="$(sudo grep -E '^TAG=' "${ENV_FILE}" | cut -d= -f2-)"
 PREV_BASE="${PREV_TAG%%-pinion*}"
 
 # ---------------------------------------------------------------------------
+# Did this build LOSE a patch the running image has?
+#
+# Every overlay lands as /app/pinion-<name>. The set in the new image must be a
+# superset of the set in the one it replaces — a patch that silently disappears
+# is the worst kind of regression, because the image builds, boots, passes its
+# health check and serves traffic with a feature quietly gone.
+#
+# 2026-09-21: exactly that happened. google-apis-oauth was deployed to this box
+# from an unmerged branch, so /opt/twenty-branding/Dockerfile had the stage and
+# the git repo did not. Syncing the repo's Dockerfile over it to add a different
+# patch dropped the Google one from pinion.14 and .15, and nothing noticed for
+# two builds. It was dormant (its env vars are unset) so nothing broke, which is
+# precisely why it would have stayed lost.
+# ---------------------------------------------------------------------------
+patches_in() {
+  docker run --rm --entrypoint sh "$1" -c 'ls -d /app/pinion-* 2>/dev/null | xargs -n1 basename' 2>/dev/null | sort
+}
+
+if docker image inspect "${PREV_TAG}" >/dev/null 2>&1; then
+  echo
+  echo "=== Checking no overlay was lost against ${PREV_TAG} ==="
+  MISSING="$(comm -23 <(patches_in "${PREV_TAG}") <(patches_in "${PINION_TAG}"))"
+  if [ -n "${MISSING}" ]; then
+    echo "REFUSING TO DEPLOY — these overlays are in ${PREV_TAG} but not in ${PINION_TAG}:"
+    echo "${MISSING}" | sed 's/^/    /'
+    echo "Someone's patch is missing from the Dockerfile. Find it before shipping."
+    exit 1
+  fi
+  patches_in "${PINION_TAG}" | sed 's/^/    ok  /'
+else
+  echo "(${PREV_TAG} not present locally — skipping the lost-overlay check)"
+fi
+
+# ---------------------------------------------------------------------------
 # Does this deploy need Twenty's migration cycle?
 #
 # The entrypoint runs cache:flush -> upgrade -> cache:flush -> cron:register
