@@ -33,6 +33,9 @@ export const EmailThreadIntermediaryMessages = ({
         participants={message.messageParticipants}
         body={message.text}
         sentAt={message.receivedAt}
+        deliveryStatus={message.deliveryStatus}
+        openCount={message.openCount}
+        clickCount={message.clickCount}
       />
     ))
   ) : (

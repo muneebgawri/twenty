@@ -18,6 +18,13 @@ export class MessageWorkspaceEntity extends BaseWorkspaceEntity {
   subject: string | null;
   text: string | null;
   receivedAt: Date | null;
+  deliveryStatus: 'SENT' | 'OPENED' | 'CLICKED' | null;
+  scheduledAt: Date | null;
+  sentAt: Date | null;
+  firstOpenedAt: Date | null;
+  lastClickedAt: Date | null;
+  openCount: number;
+  clickCount: number;
   messageThread: EntityRelation<MessageThreadWorkspaceEntity> | null;
   messageThreadId: string | null;
   messageParticipants: EntityRelation<MessageParticipantWorkspaceEntity[]>;

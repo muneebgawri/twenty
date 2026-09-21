@@ -35,9 +35,14 @@ export class SendEmailService {
     sendResult: SendMessageResult,
     data: ComposedEmail,
     workspaceId: string,
-  ): Promise<void> {
+    options?: {
+      messageId?: string;
+      scheduledAt?: Date;
+    },
+  ): Promise<string | undefined> {
     try {
-      await this.sentMessagePersistenceService.persistSentMessage({
+      return await this.sentMessagePersistenceService.persistSentMessage({
+        messageId: options?.messageId,
         sendResult,
         subject: data.sanitizedSubject,
         body: data.plainTextBody,
@@ -46,11 +51,14 @@ export class SendEmailService {
         messageChannelId: data.messageChannelId,
         inReplyTo: data.inReplyTo,
         workspaceId,
+        scheduledAt: options?.scheduledAt,
       });
     } catch (persistenceError) {
       this.logger.warn(
         `Failed to persist sent message (sync will recover): ${persistenceError}`,
       );
+
+      return undefined;
     }
   }
 }

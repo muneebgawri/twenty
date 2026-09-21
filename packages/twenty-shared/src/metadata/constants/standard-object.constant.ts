@@ -1659,6 +1659,27 @@ export const STANDARD_OBJECTS = {
       receivedAt: {
         universalIdentifier: '20202020-140a-4a2a-9f86-f13b6a979afc',
       },
+      deliveryStatus: {
+        universalIdentifier: '8fe37680-bf9c-4ef7-a5c0-a73e06541699',
+      },
+      scheduledAt: {
+        universalIdentifier: '203daf26-2e1e-4fb1-8e27-4ce8151b2799',
+      },
+      sentAt: {
+        universalIdentifier: '0a20efff-060a-4f0e-adc0-d77e3cc52933',
+      },
+      firstOpenedAt: {
+        universalIdentifier: '59d3eef6-00cc-4624-94a6-9d0c57f1c995',
+      },
+      lastClickedAt: {
+        universalIdentifier: '053d86b4-062d-45df-9adf-05f3210d9642',
+      },
+      openCount: {
+        universalIdentifier: '508d88a7-0bb7-43db-a8c3-91edd0c240d9',
+      },
+      clickCount: {
+        universalIdentifier: '2a96f8a8-05a5-483d-8072-1db16f625e27',
+      },
       messageParticipants: {
         universalIdentifier: '20202020-7cff-4a74-b63c-73228448cbd9',
       },

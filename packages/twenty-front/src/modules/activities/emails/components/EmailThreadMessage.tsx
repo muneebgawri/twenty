@@ -36,6 +36,14 @@ const StyledThreadMessageBody = styled.div`
   padding: ${themeCssVariables.spacing[0]} ${themeCssVariables.spacing[2]};
 `;
 
+const StyledTracking = styled.div`
+  color: ${themeCssVariables.font.color.tertiary};
+  display: flex;
+  font-size: ${themeCssVariables.font.size.xs};
+  gap: ${themeCssVariables.spacing[2]};
+  margin-top: ${themeCssVariables.spacing[2]};
+`;
+
 type EmailThreadMessageProps = {
   body: string;
   sentAt: string;
@@ -43,6 +51,9 @@ type EmailThreadMessageProps = {
   participants: EmailThreadMessageParticipant[];
   isExpanded?: boolean;
   hideBottomBorder?: boolean;
+  deliveryStatus?: 'SENT' | 'OPENED' | 'CLICKED' | null;
+  openCount?: number;
+  clickCount?: number;
 };
 
 export const EmailThreadMessage = ({
@@ -52,6 +63,9 @@ export const EmailThreadMessage = ({
   participants,
   isExpanded = false,
   hideBottomBorder = false,
+  deliveryStatus,
+  openCount = 0,
+  clickCount = 0,
 }: EmailThreadMessageProps) => {
   const [isOpen, setIsOpen] = useState(isExpanded);
 
@@ -85,6 +99,13 @@ export const EmailThreadMessage = ({
           <EmailThreadMessageBody body={body} isDisplayed />
         ) : (
           <EmailThreadMessageBodyPreview body={body} />
+        )}
+        {deliveryStatus && (
+          <StyledTracking>
+            <span>{deliveryStatus.toLowerCase()}</span>
+            {openCount > 0 && <span>{openCount} opens</span>}
+            {clickCount > 0 && <span>{clickCount} clicks</span>}
+          </StyledTracking>
         )}
       </StyledThreadMessageBody>
     </StyledThreadMessage>
