@@ -51,10 +51,35 @@ test('a domain with an MX record is allowed', async () => {
 });
 
 test('no MX but an A record is allowed — RFC 5321 makes it an implicit mail exchanger', async () => {
-  // This is not a corner case. example.com resolves exactly this way, and so do plenty of
-  // small publications. A gate that rejected "no MX" alone would refuse real addresses.
-  const r = resolverFor({ 'example.com': { a: ['93.184.216.34'] } });
-  assert.equal(await gate.reject(EMAILS, emails('press@example.com'), r), null);
+  // Not a corner case: neverssl.com resolves exactly this way today, and so do plenty of
+  // small publications that never published an MX. A gate that rejected "no MX" alone
+  // would refuse real addresses.
+  const r = resolverFor({ 'neverssl.com': { a: ['34.223.124.45'] } });
+  assert.equal(await gate.reject(EMAILS, emails('press@neverssl.com'), r), null);
+});
+
+test('a null MX is a refusal, not a record — RFC 7505', async () => {
+  // "0 ." is a domain stating outright that it accepts no mail. It is the clearest
+  // possible version of the thing this module exists to detect, and the first draft read
+  // it as "has an MX, therefore fine" — exactly backwards. The unit tests agreed with the
+  // bug because the fake resolver was written from the same wrong assumption; checking a
+  // real domain is what caught it. example.com publishes a null MX.
+  for (const exchange of ['.', '']) {
+    mx._clear();
+    const r = resolverFor({ 'example.com': { mx: [{ preference: 0, exchange }] } });
+    const reason = await gate.reject(EMAILS, emails('press@example.com'), r);
+    assert.ok(reason, `a null MX of "${exchange}" must be refused`);
+    assert.match(reason, /no mail server/i);
+  }
+});
+
+test('a null MX alongside real ones is not a null MX', async () => {
+  // The RFC defines it as the ONLY record. A domain listing "." beside a working exchanger
+  // is misconfigured, not opted out, and refusing its mail would be our error not theirs.
+  const r = resolverFor({
+    'mixed.example': { mx: [{ preference: 0, exchange: '.' }, { preference: 10, exchange: 'mx.mixed.example' }] },
+  });
+  assert.equal(await gate.reject(EMAILS, emails('a@mixed.example'), r), null);
 });
 
 test('IPv6-only is allowed too', async () => {

@@ -76,6 +76,21 @@ function isAbsence(err) {
   return err && (err.code === 'ENOTFOUND' || err.code === 'ENODATA');
 }
 
+/**
+ * RFC 7505: a single MX record of preference 0 pointing at "." is a domain explicitly
+ * declaring that it accepts no mail. It is the clearest possible statement of the thing
+ * this module is trying to establish, and reading it as "has an MX, therefore fine" gets
+ * the answer exactly backwards.
+ *
+ * example.com is published this way, which is how this was caught — the unit tests used a
+ * fake resolver and agreed with the bug.
+ */
+function isNullMx(records) {
+  if (!Array.isArray(records) || records.length !== 1) return false;
+  const exchange = String(records[0] && records[0].exchange || '').trim();
+  return exchange === '' || exchange === '.';
+}
+
 async function hasRecords(lookup, domain) {
   try {
     const records = await withTimeout(lookup(domain));
@@ -106,12 +121,24 @@ async function cannotReceiveMail(domain, resolver = systemResolver) {
   const known = cached(domain);
   if (known !== undefined) return !known;
 
-  const mx = await hasRecords(resolver.mx, domain);
-  if (mx === 'yes') {
+  // Fetched rather than reduced to yes/no, because a null MX is a "yes, there are records"
+  // that means the opposite of what every other MX answer means.
+  let mxRecords = null;
+  try {
+    mxRecords = await withTimeout(resolver.mx(domain));
+  } catch (err) {
+    if (!isAbsence(err)) return false; // no answer is not an answer
+  }
+
+  if (isNullMx(mxRecords)) {
+    remember(domain, false); // the domain says so itself
+    return true;
+  }
+
+  if (Array.isArray(mxRecords) && mxRecords.length > 0) {
     remember(domain, true);
     return false;
   }
-  if (mx === 'unknown') return false; // no answer is not an answer
 
   // No MX. RFC 5321 §5.1: an address record is an implicit mail exchanger, so this is not
   // yet a verdict.
