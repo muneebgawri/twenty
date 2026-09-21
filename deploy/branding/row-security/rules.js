@@ -169,6 +169,16 @@ const RULES = {
   // explain why.
   leadLookupRequest: CREATOR,
 
+  // Journalists scraped by Crawlix. A shared research pool, not a book of
+  // business: nobody owns a journalist, and two AMs pitching the same reporter
+  // different clients is normal press relations rather than poaching. So
+  // VISIBLE, unlike person.
+  //
+  // Nothing here is private in the way a contact is — it is a byline, a beat
+  // and a publicly listed work address, which is what the outlet publishes on
+  // purpose. Every row is scraped from a public page.
+  journalist: VISIBLE,
+
   // --- mailbox contents ----------------------------------------------------
   // A message is readable only when the member is a participant on it — their
   // own correspondence, which they can already read in their mailbox. This is
