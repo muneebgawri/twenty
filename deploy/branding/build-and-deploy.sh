@@ -62,19 +62,25 @@ patches_in() {
   docker run --rm --entrypoint sh "$1" -c 'ls -d /app/pinion-* 2>/dev/null | xargs -n1 basename' 2>/dev/null | sort
 }
 
-if docker image inspect "${PREV_TAG}" >/dev/null 2>&1; then
+# PREV_TAG is the bare tag from .env ("v2.39.5-pinion.15"), not a reference docker can
+# resolve. The first version of this check passed it to `docker image inspect` as-is, which
+# always failed, so the guard skipped every time and said so in one line nobody reads. A
+# check that silently does nothing is the failure it exists to prevent.
+PREV_IMAGE="twentycrm/twenty:${PREV_TAG}"
+
+if docker image inspect "${PREV_IMAGE}" >/dev/null 2>&1; then
   echo
-  echo "=== Checking no overlay was lost against ${PREV_TAG} ==="
-  MISSING="$(comm -23 <(patches_in "${PREV_TAG}") <(patches_in "${PINION_TAG}"))"
+  echo "=== Checking no overlay was lost against ${PREV_IMAGE} ==="
+  MISSING="$(comm -23 <(patches_in "${PREV_IMAGE}") <(patches_in "${PINION_TAG}"))"
   if [ -n "${MISSING}" ]; then
-    echo "REFUSING TO DEPLOY — these overlays are in ${PREV_TAG} but not in ${PINION_TAG}:"
+    echo "REFUSING TO DEPLOY — these overlays are in ${PREV_IMAGE} but not in ${PINION_TAG}:"
     echo "${MISSING}" | sed 's/^/    /'
     echo "Someone's patch is missing from the Dockerfile. Find it before shipping."
     exit 1
   fi
   patches_in "${PINION_TAG}" | sed 's/^/    ok  /'
 else
-  echo "(${PREV_TAG} not present locally — skipping the lost-overlay check)"
+  echo "(${PREV_IMAGE} not present locally — skipping the lost-overlay check)"
 fi
 
 # ---------------------------------------------------------------------------
