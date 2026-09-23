@@ -1,6 +1,6 @@
 # PRD — Email productivity in Twenty (scheduling, tracking, signatures)
 
-**Status:** approved to build, not started
+**Status:** approved to build. §7 experiments run 2026-09-23 — 7.2 answered and §4.2 revised; 7.1 blocked on a staging worker. Feature code not started.
 **Audience:** whoever builds this. Assumes you know React and GraphQL, assumes you know nothing about this Twenty deployment.
 **Supersedes:** PR #1 (`feature/crm-wishlist`), which is architecturally incompatible — see §9.
 
@@ -334,9 +334,17 @@ read-modify-write race that downgraded CLICKED back to OPENED.
 - Return the GIF even for an unknown token, or you leak record existence to anyone holding
   any valid signature.
 
-**Blocked pending §7.2:** click tracking needs a `302` + `Location`. Open tracking does not
-strictly need custom headers (the GET fires regardless; the image merely fails to render),
-so **open tracking can ship first**.
+**Resolved by §7.2 — read it before building this.** Click tracking is *not* blocked, but
+neither endpoint works as drafted above:
+
+- A public Twenty route **cannot** send `Location`; redirect with an HTML meta-refresh
+  interstitial instead (verified).
+- A public Twenty route **cannot** return binary, so the pixel cannot be a GIF served from
+  Twenty. **Herald serves the pixel bytes**; the Twenty route records the event.
+- The token goes in the **query string** (`?k=<token>`), not a path segment — `pathParameters`
+  is always empty.
+
+Open tracking can still ship first; it just has one more moving part than assumed.
 
 ### 4.3 Feature C — signatures
 
@@ -384,20 +392,92 @@ production and looked at.
 
 ---
 
-## 7. Experiments to run FIRST
+## 7. Experiments — RESULTS (run 2026-09-23 on staging)
 
-Both are small, and both decide scope. Do them before writing feature code.
+Both were run with a throwaway app, `route-probe`, four logic functions, five
+deploy iterations. **7.2 is answered and changes the design. 7.1 is blocked on
+infrastructure, not on Twenty.**
 
-**7.1 — Does a cron logic function have user context in 2.39?**
-The 2.39 SDK exposes `LogicFunctionExecutionContext.userWorkspaceId: string | null`, which
-hints user context is propagated for *user-initiated* invocations. Cron cannot benefit in
-principle, but confirm it empirically. **If it somehow does, feature A needs no patch at
-all** and §4.1's security note disappears. Worth an hour.
+### 7.1 — Does a cron logic function have user context? **UNANSWERED — cannot be tested on staging.**
 
-**7.2 — Can a public logic-function route return a 302 and a custom `Content-Type`?**
-Deploy a throwaway app with one `isAuthRequired: false` route returning
-`{ __twentyHttpResponse: true, status: 302, headers: { Location: '...' } }`, and a second
-returning `Content-Type: image/gif`. `curl -i` both. **This decides click tracking.**
+`staging has no worker container.` Production runs `twenty-worker-1`; staging
+runs only `twenty-staging-server-1`, `-db-1` and `-redis-1`. Cron fires in the
+worker, so **no cron job can ever run on staging as currently configured.**
+
+Proven, not assumed: `probe-cron` registered correctly — `core."logicFunction"`
+on staging holds `probe-cron | {"pattern": "* * * * *"}` — and after 15 minutes
+`core."keyValuePair"` still held no observation.
+
+This invalidates part of §6: *"the app installs cleanly on staging first"* cannot
+cover **any** cron-dependent behaviour, which is all of feature A. Either stand
+up a staging worker, or accept that scheduled send is first exercised in
+production.
+
+To answer 7.1, pick one:
+- **start a worker on staging** (also restores staging as a real rehearsal for
+  feature A), or
+- **install `route-probe` on production** — it has no record permissions at all,
+  writes one kv key and serves four `/s/probe/*` routes.
+
+The prior is still that cron has no user context; nothing here contradicts it.
+
+### 7.2 — What can a PUBLIC `httpRoute` return? **ANSWERED.**
+
+| Thing | Result |
+|---|---|
+| `status` | **Honoured** — a 302 comes back as a 302 |
+| `Content-Type` | **Honoured** |
+| `Cache-Control` | **Honoured** |
+| `Location` | **STRIPPED** — both `Location` and `location`; `curl -L` reports 0 redirects |
+| Custom `X-*` headers | **STRIPPED** |
+| `charset` | **Forced to `utf-8`**, overriding an explicit `iso-8859-1` |
+| Binary body | **Impossible** — see below |
+
+So response headers are an **allowlist**, not pass-through. `Content-Type` and
+`Cache-Control` survive; nothing else tested did.
+
+**Binary bodies are re-encoded as UTF-8 and cannot be turned off.** The 43-byte
+transparent GIF arrives as 47 bytes: `0x80` → `c2 80`, `0xff` → `c3 bf`,
+`0xf9` → `c3 b9`. A `Buffer` body JSON-serialises to `{"type":"Buffer",...}`;
+`Uint8Array` to `{"0":71,...}`; `Array` to `[71,73,...]`. A latin1 string gets
+the magic bytes right and mangles everything above 0x7F. Setting
+`charset=iso-8859-1` does not help — the response came back
+`image/gif; charset=utf-8` anyway, and even `application/octet-stream` was given
+`; charset=utf-8`.
+
+#### Consequences for §4.2
+
+1. **Click tracking is NOT blocked, and does not need a 302.** A click opens in a
+   browser, not a mail client, so an HTML interstitial redirects just as well.
+   Verified on staging: `Content-Type: text/html` plus
+   `<meta http-equiv="refresh" content="0;url=...">` and a
+   `location.replace()` fallback, body delivered byte-intact. Costs a visible
+   flash and a render; link scanners that do not execute it simply do not
+   register a click, which is the correct outcome anyway.
+
+2. **The open pixel cannot be a GIF from a Twenty route.** Three options:
+   - **SVG pixel** — `image/svg+xml` is pure ASCII and arrives intact (verified),
+     but many mail clients refuse to load SVG, so opens would be undercounted
+     and unevenly across clients.
+   - **Serve the pixel from Herald** — an Express app we control fully, already
+     serving `/api/uploads/**` with custom headers. Twenty keeps the recording;
+     Herald just returns 43 correct bytes. Adds a cross-service hop.
+   - **Accept a broken image.** Rejected: visible to the recipient.
+
+   Recommendation: **Herald serves the pixel bytes.** It is the only option that
+   is both correct and universally rendered.
+
+3. `pathParameters` is **always empty** on these routes — verified with
+   `/s/probe/echo`. A tracking token must travel as a **query string**
+   (`queryStringParameters` populates correctly), not as a path segment. §4.2's
+   `/s/t/o/<token>` shape does not work; use `/s/t/o?k=<token>`.
+
+4. Request `headers` arrive **empty** unless listed in `forwardedRequestHeaders`
+   — confirming §3.4's gotcha from the other direction.
+
+5. The payload field is `queryStringParameters`, not `queryParams`. Reading the
+   wrong key cost one deploy cycle and produced four identical results that
+   looked like a server-side limitation.
 
 ---
 
