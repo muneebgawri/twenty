@@ -192,3 +192,36 @@ describe('withTrackingPixel', () => {
     expect(html).toContain('a=1&amp;b=2');
   });
 });
+
+describe('what actually goes on the wire', () => {
+  // Reproduces the composer's assembly exactly, because "the code looks right"
+  // has already been wrong once here.
+  const MINTED =
+    'https://staging.heraldengine.com/api/public/track/ext/open?t=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJraW5kIjoiZXh0In0.abc-_123';
+
+  it('keeps the pixel in the body that sendEmail receives', () => {
+    const signature = composeSignature(
+      'Matt Marshall',
+      { logoUrl: 'https://pinionnewswire.com/logo.svg', logoWidthPx: 160 },
+      'lead@example.com',
+    );
+    const withSignature = `<p>hello</p><br><br>${signature}`;
+    const sent = withTrackingPixel(withSignature, MINTED);
+
+    expect(sent).toContain('<p>hello</p>');
+    expect(sent).toContain('Matt Marshall');
+    expect(sent).toContain('track/ext/open?t=');
+    // The tail matters: a pixel appended before the signature would be inside
+    // the table and could be dropped by a client that rewrites tables.
+    expect(sent.trimEnd().endsWith('>')).toBe(true);
+    expect(sent.lastIndexOf('<img') > sent.lastIndexOf('</table>')).toBe(true);
+  });
+
+  it('does not mangle a JWT in the query string', () => {
+    // safeUrl() runs the URL through new URL().toString(); a JWT's dots,
+    // hyphens and underscores must survive it untouched.
+    const sent = withTrackingPixel('x', MINTED);
+    expect(sent).toContain('eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9');
+    expect(sent).toContain('abc-_123');
+  });
+});

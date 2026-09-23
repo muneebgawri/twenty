@@ -13,6 +13,9 @@ type HeraldWebhookBody = {
     recipient?: string;
     messageRef?: string;
     sentBy?: string | null;
+    automated?: boolean;
+    automatedReason?: string;
+    userAgent?: string | null;
     url?: string | null;
     openedAt?: string;
     clickedAt?: string;
@@ -75,6 +78,12 @@ const handler = async (payload: RoutePayload<HeraldWebhookBody>) => {
           // rules.js has nothing to bind OWN('sentBy') to and the event is
           // invisible to the only person entitled to see it.
           sentById: body.data?.sentBy ?? null,
+          // Recorded, not filtered. Herald labels a fetch it believes is a
+          // proxy or a pre-fetch; what a report does with that is a separate
+          // decision, and a misjudged fetch is still a fact worth keeping.
+          automated: body.data?.automated === true,
+          automatedReason: body.data?.automatedReason ?? '',
+          userAgent: body.data?.userAgent ?? '',
           occurredAt:
             body.data?.openedAt ?? body.data?.clickedAt ?? body.timestamp ?? new Date().toISOString(),
           url: body.data?.url ?? '',

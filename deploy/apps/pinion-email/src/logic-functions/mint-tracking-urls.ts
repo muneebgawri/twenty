@@ -24,10 +24,15 @@ type MintRequest = {
  */
 const handler = async (payload: RoutePayload<MintRequest>) => {
   const secret = process.env.EXTERNAL_TRACKING_TOKEN_SECRET ?? '';
-  const base = (process.env.HERALD_TRACKING_BASE_URL ?? '').replace(/\/+$/, '');
+  // Full URLs, not a base plus a path this function knows. The whole point of
+  // the branded host is that the URL in the email is short and first-party --
+  // https://track.pinionnewswire.com/o rather than a long API path on someone
+  // else's domain -- so the shape has to be configuration, not code.
+  const openBase = (process.env.HERALD_TRACKING_OPEN_URL ?? '').trim();
+  const clickBase = (process.env.HERALD_TRACKING_CLICK_URL ?? '').trim();
   const tenantId = process.env.HERALD_TENANT_ID ?? '';
 
-  if (!secret || !base || !tenantId) {
+  if (!secret || !openBase || !tenantId) {
     return { configured: false };
   }
 
@@ -39,6 +44,10 @@ const handler = async (payload: RoutePayload<MintRequest>) => {
 
   const messageRef = body.messageRef ?? '';
   const sentBy = body.sentBy;
+  // Minted here rather than taken from the caller: the send is moments away,
+  // and a client clock that is wrong would classify every open as a pre-fetch
+  // or none of them.
+  const sentAt = new Date().toISOString();
 
   const mint = (destinationUrl?: string) =>
     signHs256(
@@ -48,20 +57,23 @@ const handler = async (payload: RoutePayload<MintRequest>) => {
         recipient,
         messageRef,
         ...(sentBy ? { sentBy } : {}),
+        sentAt,
         ...(destinationUrl ? { destinationUrl } : {}),
       },
       secret,
     );
 
-  const openUrl = `${base}/public/track/ext/open?t=${await mint()}`;
+  const join = (url: string, token: string) =>
+    `${url}${url.includes('?') ? '&' : '?'}t=${token}`;
+
+  const openUrl = join(openBase, await mint());
 
   // One token per destination: the URL is inside the signature, so a single
   // shared token could be pointed anywhere by editing the query string.
   const clickUrls: Record<string, string> = {};
   for (const destination of body.destinations ?? []) {
-    if (/^https?:\/\//i.test(destination)) {
-      clickUrls[destination] =
-        `${base}/public/track/ext/click?t=${await mint(destination)}`;
+    if (/^https?:\/\//i.test(destination) && clickBase.length > 0) {
+      clickUrls[destination] = join(clickBase, await mint(destination));
     }
   }
 

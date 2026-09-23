@@ -11,6 +11,12 @@ export const MESSAGE_REF_FIELD_UNIVERSAL_IDENTIFIER =
   '16f084b3-50d5-445d-bd0c-cc317c1262d1';
 export const OCCURRED_AT_FIELD_UNIVERSAL_IDENTIFIER =
   '30bb5a89-466a-4a4f-b494-8e4ad1941fc8';
+export const AUTOMATED_FIELD_UNIVERSAL_IDENTIFIER =
+  '9b86b376-41fd-40a8-a588-9543f1345230';
+export const AUTOMATED_REASON_FIELD_UNIVERSAL_IDENTIFIER =
+  '121f3547-498b-4fa7-ae02-83d0e42326bb';
+export const USER_AGENT_FIELD_UNIVERSAL_IDENTIFIER =
+  '32ceed17-95de-4540-a86b-d2042ce8e61b';
 export const URL_FIELD_UNIVERSAL_IDENTIFIER =
   'fa5671c3-3770-41d1-8d4e-577d4632b47e';
 
@@ -68,6 +74,33 @@ export default defineObject({
       label: 'Occurred at',
       description: 'When Herald recorded it',
       icon: 'IconClock',
+    },
+    {
+      universalIdentifier: AUTOMATED_FIELD_UNIVERSAL_IDENTIFIER,
+      type: FieldType.BOOLEAN,
+      name: 'automated',
+      label: 'Machine',
+      description:
+        'A proxy or pre-fetch rather than a person. Apple pre-fetches every image, so counting these as opens inflates the number most for the recipients who engaged least.',
+      icon: 'IconRobot',
+    },
+    {
+      universalIdentifier: AUTOMATED_REASON_FIELD_UNIVERSAL_IDENTIFIER,
+      type: FieldType.TEXT,
+      name: 'automatedReason',
+      label: 'Why',
+      description:
+        'Which signal decided it: a named proxy, the prefetch window, or unclassified.',
+      icon: 'IconQuestionMark',
+    },
+    {
+      universalIdentifier: USER_AGENT_FIELD_UNIVERSAL_IDENTIFIER,
+      type: FieldType.TEXT,
+      name: 'userAgent',
+      label: 'User agent',
+      description:
+        'Kept so the classification can be improved later against real traffic rather than guesses.',
+      icon: 'IconDeviceDesktop',
     },
     {
       universalIdentifier: URL_FIELD_UNIVERSAL_IDENTIFIER,

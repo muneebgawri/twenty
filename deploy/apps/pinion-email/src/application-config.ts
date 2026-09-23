@@ -21,10 +21,16 @@ export default defineApplication({
         "Shared with Herald, and deliberately NOT Herald's campaign tracking key: the composer has to mint tokens, so this one leaves Herald and a shared key would let anything holding it forge campaign tokens too.",
       isSecret: true,
     },
-    HERALD_TRACKING_BASE_URL: {
+    HERALD_TRACKING_OPEN_URL: {
       universalIdentifier: '87c4f629-733d-411a-ac2c-362ed72ffc82',
       description:
-        'Where the pixel and click URLs point, e.g. https://staging.heraldengine.com/api. Tracking stays off until it is set.',
+        'The full open-pixel URL, e.g. https://track.pinionnewswire.com/o. A branded host on the sending domain is first-party to Gmail and Outlook, so the image is far likelier to load at all. Tracking stays off until it is set.',
+      isSecret: false,
+    },
+    HERALD_TRACKING_CLICK_URL: {
+      universalIdentifier: 'a944a681-bebd-490c-9ec0-507009fb8ba2',
+      description:
+        'The full click-redirect URL, e.g. https://track.pinionnewswire.com/c. Links are left unwrapped if unset.',
       isSecret: false,
     },
     HERALD_TENANT_ID: {
