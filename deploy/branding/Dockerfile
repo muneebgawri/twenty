@@ -173,10 +173,22 @@ RUN set -eu; \
     node --check "$D"; \
     cd /app/pinion-email-gate && node --test
 
-# Marker — Docker image label so we can tell at a glance that the overlay
-# is applied. (Non-root user inside the image can't write to /app, so we
-# use LABEL metadata instead of a marker file.)
-# Inspect with: docker image inspect <tag> --format '{{.Config.Labels}}'
+# Marker — Docker image labels so we can tell at a glance what this image is.
+# (Non-root user inside the image can't write to /app, so we use LABEL metadata
+# instead of a marker file.)
+# Inspect with: docker image inspect <tag> --format '{{json .Config.Labels}}'
+#
+# overlay-sha is the commit these overlay files came from, and it is the only
+# label here worth trusting, because it is the only one nobody has to remember
+# to update. The two it replaces were hand-maintained and had rotted exactly as
+# you would expect: branding-applied-on still said 2026-05-08 four months later,
+# and patches named one of the seven. A stale label is worse than no label --
+# it answers the question wrongly instead of admitting it cannot.
+#
+# A build from a working tree with uncommitted changes is stamped <sha>-dirty,
+# so an image that did not come from a commit says so for the rest of its life.
+ARG OVERLAY_SHA=unknown
+ARG OVERLAY_BUILT_AT=unknown
 LABEL co.pinion.branding-stage="stage2"
-LABEL co.pinion.branding-applied-on="2026-05-08"
-LABEL co.pinion.patches="front-component-widget-typename"
+LABEL co.pinion.overlay-sha="${OVERLAY_SHA}"
+LABEL co.pinion.overlay-built-at="${OVERLAY_BUILT_AT}"

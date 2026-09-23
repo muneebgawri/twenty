@@ -10,19 +10,107 @@
 #   $2  REVISION        (optional) overlay revision, e.g. 2 -> v2.2.0-pinion.2.
 #                       Use a new revision whenever the overlay changes so the
 #                       previous image stays on disk for a one-line rollback.
+#
+# Flags:
+#   --update        fast-forward the checkout to OVERLAY_REF before building
+#   --build-dirty   build from the working tree even though it has uncommitted
+#                   changes; the image is stamped <sha>-dirty
+#
+# Env:
+#   OVERLAY_REF     what the checkout should match (default: origin/main)
 
 set -euo pipefail
 
-TWENTY_VERSION="${1:-v2.2.0}"
-REVISION="${2:-}"
+ARGS=()
+ALLOW_DIRTY=0
+ALLOW_BEHIND=0
+for a in "$@"; do
+  case "$a" in
+    --update)      ALLOW_BEHIND=1 ;;
+    --build-dirty) ALLOW_DIRTY=1 ;;
+    --*)           echo "unknown flag: $a" >&2; exit 2 ;;
+    *)             ARGS+=("$a") ;;
+  esac
+done
+
+TWENTY_VERSION="${ARGS[0]:-v2.2.0}"
+REVISION="${ARGS[1]:-}"
+OVERLAY_REF="${OVERLAY_REF:-origin/main}"
 PINION_SUFFIX="${TWENTY_VERSION}-pinion${REVISION:+.${REVISION}}"
 PINION_TAG="twentycrm/twenty:${PINION_SUFFIX}"
 COMPOSE_FILE="/opt/twenty/docker-compose.yml"
 
-echo "=== Building ${PINION_TAG} from ${TWENTY_VERSION} ==="
 cd "$(dirname "$0")"
+
+# ---------------------------------------------------------------------------
+# Is this tree the source of truth, or a copy of one?
+#
+# This directory used to be a hand-made copy of deploy/branding/, and it drifted
+# in both directions. 2026-09-21: the box had a google-apis-oauth stage the repo
+# did not, and syncing the repo over it dropped that patch from two builds.
+# 2026-09-24: rules.js on the box was two commits behind, so a build would have
+# shipped a stale ruleset. Neither showed up anywhere — the image builds, boots,
+# passes its health check, and serves traffic with the difference in it.
+#
+# It is a git checkout now, so the tree either matches a commit or says why not.
+# Note what this deliberately does NOT do: it never discards local work. A blind
+# `git reset --hard` here is precisely what caused the 2026-09-21 loss. Dirty
+# means stop and let a human decide; --build-dirty proceeds and brands the image
+# so the decision is not forgotten.
+# ---------------------------------------------------------------------------
+if ! git rev-parse --git-dir >/dev/null 2>&1; then
+  echo "REFUSING TO BUILD — $(pwd) is not a git checkout."
+  echo "The overlay must be built from a tree git can account for. Clone it:"
+  echo "    git clone --filter=blob:none --sparse https://github.com/muneebgawri/twenty.git /opt/twenty-overlay"
+  echo "    git -C /opt/twenty-overlay sparse-checkout set deploy/branding"
+  exit 1
+fi
+
+echo "=== Checking the overlay tree against ${OVERLAY_REF} ==="
+git fetch --quiet origin || echo "  (fetch failed — checking against the last known ${OVERLAY_REF})"
+
+DIRTY="$(git status --porcelain -- .)"
+if [ -n "${DIRTY}" ]; then
+  if [ "${ALLOW_DIRTY}" = 1 ]; then
+    echo "  building from a DIRTY tree (--build-dirty). The image will be stamped -dirty:"
+    echo "${DIRTY}" | sed 's/^/    /'
+  else
+    echo "REFUSING TO BUILD — uncommitted changes in $(pwd):"
+    echo "${DIRTY}" | sed 's/^/    /'
+    echo
+    echo "Commit and push them, or pass --build-dirty to build them as-is."
+    echo "This script will not discard your work for you."
+    exit 1
+  fi
+fi
+
+if git rev-parse --verify --quiet "${OVERLAY_REF}" >/dev/null; then
+  BEHIND="$(git rev-list --count "HEAD..${OVERLAY_REF}" -- . || echo 0)"
+  if [ "${BEHIND}" != "0" ]; then
+    if [ "${ALLOW_BEHIND}" = 1 ]; then
+      echo "  fast-forwarding to ${OVERLAY_REF} (--update)"
+      git merge --ff-only "${OVERLAY_REF}"
+    else
+      echo "REFUSING TO BUILD — ${BEHIND} commit(s) behind ${OVERLAY_REF} in this directory:"
+      git log --oneline "HEAD..${OVERLAY_REF}" -- . | sed 's/^/    /'
+      echo
+      echo "Pass --update to fast-forward first, or set OVERLAY_REF to build an older ref."
+      exit 1
+    fi
+  fi
+fi
+
+OVERLAY_SHA="$(git rev-parse --short=12 HEAD)"
+[ -n "${DIRTY}" ] && OVERLAY_SHA="${OVERLAY_SHA}-dirty"
+OVERLAY_BUILT_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+echo "  overlay ${OVERLAY_SHA}"
+
+echo
+echo "=== Building ${PINION_TAG} from ${TWENTY_VERSION} ==="
 docker build \
   --build-arg TWENTY_VERSION="${TWENTY_VERSION}" \
+  --build-arg OVERLAY_SHA="${OVERLAY_SHA}" \
+  --build-arg OVERLAY_BUILT_AT="${OVERLAY_BUILT_AT}" \
   -t "${PINION_TAG}" \
   .
 

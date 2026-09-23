@@ -1,0 +1,9 @@
+# Local debris from working on the box, ignored so the build's dirty-tree check
+# stays meaningful.
+#
+# A guard that cries wolf is a guard everyone learns to skip with --build-dirty,
+# at which point it is worse than no guard: it still costs a step and no longer
+# stops anything. These are the files that actually accumulate here.
+*.log
+*.pre-*
+*.bak
