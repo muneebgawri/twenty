@@ -3,6 +3,7 @@ import {
   composeSignature,
   resolveUnsubscribeUrl,
   safeUrl,
+  withTrackingPixel,
 } from '../compose-signature';
 
 describe('safeUrl', () => {
@@ -161,5 +162,33 @@ describe('line breaks', () => {
   it('leaves author HTML intact alongside the breaks', () => {
     const html = composeSignature('Matt\n<a href="https://x.test">site</a>', null);
     expect(html).toContain('Matt<br><a href="https://x.test">site</a>');
+  });
+});
+
+describe('withTrackingPixel', () => {
+  const URL = 'https://heraldengine.com/api/public/track/ext/open?t=abc.def.ghi';
+
+  it('appends a 1x1 image', () => {
+    const html = withTrackingPixel('<p>hello</p>', URL);
+    expect(html).toContain('<p>hello</p>');
+    expect(html).toContain('width="1"');
+    expect(html).toContain(URL.replace(/&/g, '&amp;'));
+  });
+
+  it('returns the body untouched when tracking is off', () => {
+    // Off is the default, and a missing URL must send a normal email rather
+    // than one with a broken image in it.
+    for (const none of [null, undefined, '']) {
+      expect(withTrackingPixel('<p>hello</p>', none)).toBe('<p>hello</p>');
+    }
+  });
+
+  it('refuses a pixel URL that is not http(s)', () => {
+    expect(withTrackingPixel('<p>hi</p>', 'javascript:alert(1)')).toBe('<p>hi</p>');
+  });
+
+  it('escapes the ampersands a query string is full of', () => {
+    const html = withTrackingPixel('x', 'https://h.test/p?a=1&b=2');
+    expect(html).toContain('a=1&amp;b=2');
   });
 });

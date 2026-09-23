@@ -191,6 +191,19 @@ const RULES = {
   // granted here; who may EDIT it is a role question, not a row one.
   emailSignatureSetting: VISIBLE,
 
+  // Opens and clicks on mail an AM sent. CREATOR is wrong here and OWN has
+  // nothing to bind to: the rows are written by a public webhook running as
+  // the app, so every one of them would be invisible to the person whose
+  // email it reports on.
+  //
+  // VISIBLE is a real decision, not a shrug. A row says an address opened a
+  // message at a time -- which is exactly the kind of thing one AM could use
+  // to see how another's outreach is going. It is accepted because the
+  // alternative is the feature not working at all, and because who sent to
+  // whom is already visible through person ownership. Revisit if tracking is
+  // ever turned on by default.
+  emailTrackingEvent: VISIBLE,
+
   // Journalists scraped by Crawlix. A shared research pool, not a book of
   // business: nobody owns a journalist, and two AMs pitching the same reporter
   // different clients is normal press relations rather than poaching. So

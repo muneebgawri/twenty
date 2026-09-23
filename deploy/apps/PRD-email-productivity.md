@@ -534,8 +534,8 @@ or a cursor, **not** the scheduled-send queue — keep that an app-owned object 
 So response headers are an **allowlist**, not pass-through. `Content-Type` and
 `Cache-Control` survive; nothing else tested did.
 
-**Binary bodies are re-encoded as UTF-8 and cannot be turned off.** The 43-byte
-transparent GIF arrives as 47 bytes: `0x80` → `c2 80`, `0xff` → `c3 bf`,
+**Binary bodies are re-encoded as UTF-8 and cannot be turned off.** The 42-byte
+transparent GIF arrives as 46 bytes: `0x80` → `c2 80`, `0xff` → `c3 bf`,
 `0xf9` → `c3 b9`. A `Buffer` body JSON-serialises to `{"type":"Buffer",...}`;
 `Uint8Array` to `{"0":71,...}`; `Array` to `[71,73,...]`. A latin1 string gets
 the magic bytes right and mangles everything above 0x7F. Setting
@@ -559,7 +559,7 @@ the magic bytes right and mangles everything above 0x7F. Setting
      and unevenly across clients.
    - **Serve the pixel from Herald** — an Express app we control fully, already
      serving `/api/uploads/**` with custom headers. Twenty keeps the recording;
-     Herald just returns 43 correct bytes. Adds a cross-service hop.
+     Herald just returns 42 correct bytes. Adds a cross-service hop.
    - **Accept a broken image.** Rejected: visible to the recipient.
 
    Recommendation: **Herald serves the pixel bytes.** It is the only option that

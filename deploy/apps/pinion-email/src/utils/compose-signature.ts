@@ -160,3 +160,30 @@ export const composeSignature = (
 
   return `<table cellpadding="0" cellspacing="0" border="0"><tbody>${rows}</tbody></table>`;
 };
+
+/**
+ * Append Herald's open pixel.
+ *
+ * Deliberately separate from composeSignature: a signature goes on every
+ * message and a pixel does not. For a UK press-relations CRM an open pixel is
+ * a GDPR/PECR consent question, so it is opt-in per send and off by default
+ * (PRD §4.2) -- the caller has to ask for it, and there is no configuration
+ * that quietly turns it on for everybody.
+ *
+ * Returns the body unchanged when there is no URL, so a missing configuration
+ * sends a normal email rather than one with a broken image in it.
+ */
+export const withTrackingPixel = (
+  html: string,
+  pixelUrl: string | null | undefined,
+): string => {
+  const safe = safeUrl(pixelUrl);
+  if (safe === null) {
+    return html;
+  }
+
+  return (
+    `${html}<img src="${safe.replace(/&/g, '&amp;').replace(/"/g, '&quot;')}" ` +
+    `alt="" width="1" height="1" style="display:block;width:1px;height:1px;border:0">`
+  );
+};
