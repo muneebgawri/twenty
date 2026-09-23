@@ -14,6 +14,26 @@ this ships the skeleton they all sit on.
   personal part.
 - A **preview** built by the same `composeSignature()` the send path uses, so
   what is approved is what goes out.
+- A **composer**, on the command menu of a selected person ("Write email
+  (Pinion)"), which sends from that person's own connected mailbox with the
+  signature appended.
+
+## Why our own composer
+
+There is no extension point in Twenty's native one — `useSendEmail.ts` and
+`useEmailComposerState.ts` read no front-component metadata, so an app can only
+ship its own. That is also what makes the signature possible at all: Twenty
+transmits `input.body` verbatim.
+
+`sendEmail` lives on the **metadata** endpoint and is gated by
+`@AuthUserWorkspaceId()`. Confirmed against staging: an API key gets *"This
+endpoint requires a user context"* and the gate fires before anything is sent.
+A front component's token passes it, which is why send-now needs no overlay
+patch — and why send-LATER does, since cron has no user (PRD §4.1, §7.1).
+
+**One message per recipient**, not one with everyone in `to`. A press contact
+must not see who else was pitched, and the unsubscribe link is per recipient —
+a shared one would let the first person who clicked it suppress somebody else.
 
 ## Unsubscribe
 

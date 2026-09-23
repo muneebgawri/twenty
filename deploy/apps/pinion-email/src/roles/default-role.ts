@@ -1,4 +1,8 @@
-import { defineRole, SystemPermissionFlag } from 'twenty-sdk/define';
+import {
+  defineRole,
+  STANDARD_OBJECT_UNIVERSAL_IDENTIFIERS,
+  SystemPermissionFlag,
+} from 'twenty-sdk/define';
 import { EMAIL_SIGNATURE_OBJECT_UNIVERSAL_IDENTIFIER } from 'src/objects/email-signature';
 import { EMAIL_SIGNATURE_SETTINGS_OBJECT_UNIVERSAL_IDENTIFIER } from 'src/objects/email-signature-settings';
 
@@ -29,7 +33,15 @@ export default defineRole({
   canUpdateAllObjectRecords: false,
   canSoftDeleteAllObjectRecords: false,
   canDestroyAllObjectRecords: false,
-  permissionFlagUniversalIdentifiers: [SystemPermissionFlag.CONNECTED_ACCOUNTS],
+  // SEND_EMAIL_TOOL is what lets the composer call sendEmail. The user is
+  // sending from their own connected mailbox with their own token, but the
+  // application still has to be granted the capability -- same lesson as
+  // CONNECTED_ACCOUNTS, same unhelpful "Entity performing the request does not
+  // have permission" when it is missing.
+  permissionFlagUniversalIdentifiers: [
+    SystemPermissionFlag.CONNECTED_ACCOUNTS,
+    SystemPermissionFlag.SEND_EMAIL_TOOL,
+  ],
   objectPermissions: [
     {
       objectUniversalIdentifier: EMAIL_SIGNATURE_OBJECT_UNIVERSAL_IDENTIFIER,
@@ -43,6 +55,18 @@ export default defineRole({
         EMAIL_SIGNATURE_SETTINGS_OBJECT_UNIVERSAL_IDENTIFIER,
       canReadObjectRecords: true,
       canUpdateObjectRecords: true,
+      canSoftDeleteObjectRecords: false,
+      canDestroyObjectRecords: false,
+    },
+    // READ ONLY, and only so the composer can prefill the address of the
+    // person it was opened on. The app never writes to person, and the user
+    // could read that record anyway -- this grants the APPLICATION what the
+    // user already has, nothing wider.
+    {
+      objectUniversalIdentifier:
+        STANDARD_OBJECT_UNIVERSAL_IDENTIFIERS.person.universalIdentifier,
+      canReadObjectRecords: true,
+      canUpdateObjectRecords: false,
       canSoftDeleteObjectRecords: false,
       canDestroyObjectRecords: false,
     },
