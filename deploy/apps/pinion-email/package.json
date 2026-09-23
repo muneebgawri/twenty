@@ -1,6 +1,6 @@
 {
   "name": "pinion-email",
-  "version": "0.11.0",
+  "version": "0.13.0",
   "private": true,
   "license": "MIT",
   "engines": {
@@ -19,8 +19,8 @@
   "dependencies": {
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.0",
-    "twenty-client-sdk": "2.39.0",
-    "twenty-sdk": "2.39.0"
+    "twenty-client-sdk": "2.41.0",
+    "twenty-sdk": "2.41.0"
   },
   "devDependencies": {
     "@types/jsonwebtoken": "^9.0.10",

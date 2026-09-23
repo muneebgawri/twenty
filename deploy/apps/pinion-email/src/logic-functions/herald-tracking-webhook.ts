@@ -95,20 +95,24 @@ const handler = async (payload: RoutePayload<HeraldWebhookBody>) => {
     },
   } as any);
 
-  // NOT surfaced on the contact's Timeline, and not for want of trying.
+  // NOT written to the contact's Timeline yet, and the reason is specific.
   //
-  // defineTimelineActivityType returns a validation wrapper --
-  // {success, config, errors, warnings} -- and twenty-sdk 2.39.0 cannot
-  // consume it either way: default-export the wrapper and the manifest builder
-  // validates the wrapper itself, failing with "TimelineActivityType must have
-  // a universalIdentifier" and no filename; export `.config` and the build
-  // passes but the type is silently absent from the manifest. Every other
-  // define* entity in this app is unwrapped for you.
+  // The activity TYPES install fine on twenty-sdk 2.41.0 -- the 2.39.0 bug
+  // where the manifest builder validated the wrapper instead of its .config is
+  // fixed. What fails is createTimelineActivity() itself, with
+  // `Expected non-nullable type "UUID!" not to be null` and no field named.
   //
-  // Without a registered type, createTimelineActivity has nothing to reference,
-  // so the call is left out rather than added inside a try/catch that would
-  // fail on every event forever and tell nobody. The "Email tracking" tab on
-  // the Person page carries this information in the meantime.
+  // Reading the SDK: it resolves the type and target object by
+  // universalIdentifier, then POSTs to /rest/timelineActivities with
+  // `...rest, timelineActivityTypeId, linkedObjectMetadataId, [targetXId]`.
+  // Anything left in `rest` is passed through, so an undefined linkedRecordId
+  // is sent as null and the API rejects it. Passing a linked record pair did
+  // not clear it either.
+  //
+  // The "Email tracking" tab on the Person page carries this information, so
+  // nothing is blocked. Left out rather than retried-and-swallowed on every
+  // event: a call that always fails and tells nobody is the failure mode this
+  // codebase keeps producing.
 
   return { ok: true };
 };
