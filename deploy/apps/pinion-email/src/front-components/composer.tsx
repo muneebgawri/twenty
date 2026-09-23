@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { extractLinks, rewriteLinks } from 'src/utils/rewrite-links';
 import {
   composeSignature,
   withTrackingPixel,
@@ -82,6 +83,11 @@ const Composer = () => {
   // CRM is a consent question, so it is never a stored preference that
   // quietly applies to everybody (PRD §4.2).
   const [trackOpens, setTrackOpens] = useState(false);
+  // A SEPARATE toggle, not one "tracking" switch. The two have different
+  // costs: an open pixel is a consent question, while rewriting links
+  // measurably hurts deliverability and makes every URL in the message point
+  // at a redirector. Someone may reasonably want one and not the other.
+  const [trackClicks, setTrackClicks] = useState(false);
   const [workspaceMemberId, setWorkspaceMemberId] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -221,12 +227,19 @@ const Composer = () => {
         branding,
         recipient,
       );
+      // Links are rewritten in the BODY ONLY, before the signature is
+      // attached: the signature carries the unsubscribe link, and an
+      // unsubscribe routed through a tracker is both worse practice and one
+      // more thing between a recipient wanting out and getting out.
+      let messageBody = body;
+      const destinations = trackClicks ? extractLinks(body) : [];
+
       let html = signature.length > 0 ? `${body}<br><br>${signature}` : body;
 
       // Minted per recipient, server side -- the signing key cannot come to a
       // browser. A failure here must not stop the send: tracking is the
       // optional part, so the email goes out untracked rather than not at all.
-      if (trackOpens) {
+      if (trackOpens || destinations.length > 0) {
         // Success is the ONLY path that says nothing. The first version
         // reported only two outcomes -- configured:false, or a thrown error --
         // so an unexpected response shape fell through both, added no pixel,
@@ -244,6 +257,7 @@ const Composer = () => {
               recipient,
               messageRef,
               sentBy: workspaceMemberId ?? undefined,
+              destinations,
             },
           );
           // The REST client has wrapped a handler's return before; unwrap one
@@ -252,7 +266,22 @@ const Composer = () => {
             ? response
             : (response?.data ?? response);
 
-          if (minted?.openUrl) {
+          if (destinations.length > 0) {
+            const tracked = minted?.clickUrls ?? {};
+            const wrapped = Object.keys(tracked).length;
+            messageBody = rewriteLinks(messageBody, tracked);
+            html =
+              signature.length > 0
+                ? `${messageBody}<br><br>${signature}`
+                : messageBody;
+            if (wrapped < destinations.length) {
+              notes.add(
+                `${destinations.length - wrapped} of ${destinations.length} links left untracked`,
+              );
+            }
+          }
+
+          if (trackOpens && minted?.openUrl) {
             html = withTrackingPixel(html, minted.openUrl);
           } else if (minted?.configured === false) {
             notes.add('tracking not configured — sent untracked');
@@ -410,7 +439,32 @@ const Composer = () => {
       <p style={HINT}>
         Off unless you tick it, every time. Adds an invisible image that tells
         us when the message is opened — think about whether this recipient
-        would expect that.
+        would expect that. Many clients block it, so silence does not mean
+        unread.
+      </p>
+
+      <label
+        style={{
+          marginTop: 12,
+          display: 'flex',
+          gap: 8,
+          alignItems: 'center',
+          cursor: 'pointer',
+        }}
+      >
+        <input
+          type="checkbox"
+          checked={trackClicks}
+          onChange={(event) => setTrackClicks(event.target.checked)}
+          style={{ colorScheme: 'light dark' }}
+        />
+        Track link clicks for this message
+      </label>
+      <p style={HINT}>
+        Also off by default, and separate on purpose: a click is a real action
+        so the data is far better than opens — but every link in the message
+        starts pointing at a redirector, which some spam filters dislike. Your
+        unsubscribe link is never rewritten.
       </p>
 
       <details style={{ marginTop: 12 }}>
