@@ -10,8 +10,21 @@ const TARGET =
   process.argv[2] ||
   '/app/packages/twenty-server/dist/engine/twenty-orm/repository/workspace-repository.js';
 
+// v2.41.0 added `operationType` to this signature. Updated rather than
+// loosened: a pattern that tolerates upstream drift is a patch that stops
+// applying without telling anyone, which is the failure this whole file exists
+// to prevent. When the next upgrade fails here, read the new signature and put
+// it in -- do not make the match fuzzy.
+//
+// Worth knowing about that upstream change: 2.41 also passes an operationType
+// of 'update' from applyRowLevelPermissionPredicates, so these predicates now
+// run on update paths and not only on reads. Our condition therefore restricts
+// what a member may UPDATE as well as what they may see. That is the safer
+// direction and consistent with the rules -- a member should not be able to
+// write a row they cannot read -- but it is a behaviour change, not a
+// like-for-like port.
 const ANCHOR =
-  'applyRowLevelPermissionPredicateForAlias({ queryBuilder, alias, flatObjectMetadata }) {';
+  'applyRowLevelPermissionPredicateForAlias({ queryBuilder, alias, flatObjectMetadata, operationType }) {';
 const GUARD = 'if (!queryBuilder.markRowLevelPermissionApplied(alias)) {';
 const MARKER = 'pinion-row-security';
 
