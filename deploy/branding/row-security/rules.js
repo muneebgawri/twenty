@@ -181,6 +181,16 @@ const RULES = {
   // so scoping it here costs the send path nothing.
   emailSignature: CREATOR,
 
+  // The shared logo, one row for the whole workspace. VISIBLE because every
+  // Account Manager's signature renders it -- CREATOR would hide the admin's
+  // row from everyone else and each signature would silently lose its logo,
+  // which is exactly the uniformity this object exists to guarantee.
+  //
+  // It carries no customer data: a logo URL, a link, a width, and a footer
+  // line that goes out on every outbound message anyway. Read is what is
+  // granted here; who may EDIT it is a role question, not a row one.
+  emailSignatureSetting: VISIBLE,
+
   // Journalists scraped by Crawlix. A shared research pool, not a book of
   // business: nobody owns a journalist, and two AMs pitching the same reporter
   // different clients is normal press relations rather than poaching. So

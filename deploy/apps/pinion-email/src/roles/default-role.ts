@@ -1,5 +1,6 @@
 import { defineRole, SystemPermissionFlag } from 'twenty-sdk/define';
 import { EMAIL_SIGNATURE_OBJECT_UNIVERSAL_IDENTIFIER } from 'src/objects/email-signature';
+import { EMAIL_SIGNATURE_SETTINGS_OBJECT_UNIVERSAL_IDENTIFIER } from 'src/objects/email-signature-settings';
 
 export const DEFAULT_ROLE_UNIVERSAL_IDENTIFIER =
   '8b3d1f6a-27c4-4e59-9a80-5f2c7d4e1b93';
@@ -35,6 +36,14 @@ export default defineRole({
       canReadObjectRecords: true,
       canUpdateObjectRecords: true,
       canSoftDeleteObjectRecords: true,
+      canDestroyObjectRecords: false,
+    },
+    {
+      objectUniversalIdentifier:
+        EMAIL_SIGNATURE_SETTINGS_OBJECT_UNIVERSAL_IDENTIFIER,
+      canReadObjectRecords: true,
+      canUpdateObjectRecords: true,
+      canSoftDeleteObjectRecords: false,
       canDestroyObjectRecords: false,
     },
   ],

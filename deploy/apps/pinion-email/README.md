@@ -6,9 +6,33 @@ this ships the skeleton they all sit on.
 
 ## What it adds
 
-- An app-owned **Email signature** object, keyed by `connectedAccountId`.
-- A **Settings** page listing the signed-in user's connected mailboxes, with a
-  signature per mailbox.
+- **Shared branding**, one row for the whole workspace: logo, the link it
+  points at, its width, a shared footer, and the unsubscribe URL. An admin sets
+  it once and every signature renders the same one, which is the only way they
+  stay uniform across accounts.
+- An app-owned **Email signature** per connected mailbox, holding just the
+  personal part.
+- A **preview** built by the same `composeSignature()` the send path uses, so
+  what is approved is what goes out.
+
+## Unsubscribe
+
+Herald mints a per-recipient JWT when **it** sends. A tool sending outside
+Herald cannot, so Herald publishes a static per-tenant form instead
+(`UnsubscribeTokenService.tenantKey`) — its docstring names this exact case,
+and blames the missing link for an opt-out rate of 0.016% and recipients
+reaching for the spam button.
+
+Stored with a `{{email}}` placeholder, never with an address: a signature is
+written once and mailed to thousands of different people, so the recipient is
+substituted per message.
+
+```
+{API_URL}/public/unsubscribe/self?e={{email}}&t=<tenantId>&k=<tenantKey>
+```
+
+Herald's GET only renders a confirmation page — a link-scanner prefetching it
+cannot unsubscribe anyone. Suppression needs the POST.
 
 ## Where the settings page actually is
 
@@ -113,16 +137,18 @@ Run for real, not against a mock (PRD §3.8 #7):
 | coverage check | 0 unclassified |
 | re-install same version | refused, object not duplicated |
 
-Checked in a browser on staging: the page loads, both queries succeed, and it
-renders its empty state — which is the correct answer there, because staging
-has no connected mailboxes.
+Checked in a browser on staging against a real connected mailbox: create,
+load and update all work, the row is keyed to the real connectedAccountId, and
+an update replaces the row rather than adding a second.
 
-**Still unverified: the editor itself** (mailbox dropdown, textarea, save). It
-only renders once `myConnectedAccounts` returns something, so it needs one
-connected mailbox on staging.
+## The preview is an iframe, and has to be
 
-Google auth is now configured there for exactly that purpose — the Pinion CRM
-OAuth client carries staging's redirect URIs as of 2026-09-23, and staging
-advertises `google: true` alongside `password: true`. What remains is a person
-clicking **Settings → Accounts → Connect account** and approving it with a
-Google account; that is a sign-in and cannot be automated.
+The first version rendered the composed HTML inline in a styled `<div>`. The
+host page's CSS reshaped it: the table collapsed into two columns, so the logo
+sat beside the text instead of above it, and the `<br>`s looked like they had
+been dropped. **The HTML was correct the whole time** — `Show HTML` proved it —
+and the preview was the thing lying, which is the worst way for a preview to
+fail, because it sends you off fixing code that already works.
+
+`srcDoc` on a sandboxed iframe gives the same isolation a mail client has. Do
+not "simplify" it back to a div.
