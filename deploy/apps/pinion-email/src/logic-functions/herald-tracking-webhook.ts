@@ -67,7 +67,9 @@ const handler = async (payload: RoutePayload<HeraldWebhookBody>) => {
     return { ok: true, ignored: true };
   }
 
-  await new CoreApiClient().mutation({
+  const core = new CoreApiClient();
+
+  await core.mutation({
     createEmailTrackingEvent: {
       __args: {
         data: {
@@ -92,6 +94,21 @@ const handler = async (payload: RoutePayload<HeraldWebhookBody>) => {
       id: true,
     },
   } as any);
+
+  // NOT surfaced on the contact's Timeline, and not for want of trying.
+  //
+  // defineTimelineActivityType returns a validation wrapper --
+  // {success, config, errors, warnings} -- and twenty-sdk 2.39.0 cannot
+  // consume it either way: default-export the wrapper and the manifest builder
+  // validates the wrapper itself, failing with "TimelineActivityType must have
+  // a universalIdentifier" and no filename; export `.config` and the build
+  // passes but the type is silently absent from the manifest. Every other
+  // define* entity in this app is unwrapped for you.
+  //
+  // Without a registered type, createTimelineActivity has nothing to reference,
+  // so the call is left out rather than added inside a try/catch that would
+  // fail on every event forever and tell nobody. The "Email tracking" tab on
+  // the Person page carries this information in the meantime.
 
   return { ok: true };
 };
