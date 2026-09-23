@@ -15,6 +15,23 @@ export default defineApplication({
     'Per-mailbox email signatures, applied when sending from Twenty',
   defaultRoleUniversalIdentifier: DEFAULT_ROLE_UNIVERSAL_IDENTIFIER,
   applicationVariables: {
+    EXTERNAL_TRACKING_TOKEN_SECRET: {
+      universalIdentifier: '68fcd340-7b33-46fb-b278-01250599a990',
+      description:
+        "Shared with Herald, and deliberately NOT Herald's campaign tracking key: the composer has to mint tokens, so this one leaves Herald and a shared key would let anything holding it forge campaign tokens too.",
+      isSecret: true,
+    },
+    HERALD_TRACKING_BASE_URL: {
+      universalIdentifier: '87c4f629-733d-411a-ac2c-362ed72ffc82',
+      description:
+        'Where the pixel and click URLs point, e.g. https://staging.heraldengine.com/api. Tracking stays off until it is set.',
+      isSecret: false,
+    },
+    HERALD_TENANT_ID: {
+      universalIdentifier: '2a6091fa-7ec7-4af4-afda-82ae77d0af78',
+      description: "The Herald tenant these sends belong to; goes inside the signed token.",
+      isSecret: false,
+    },
     HERALD_TRACKING_WEBHOOK_SECRET: {
       universalIdentifier:
         HERALD_TRACKING_WEBHOOK_SECRET_VARIABLE_UNIVERSAL_IDENTIFIER,

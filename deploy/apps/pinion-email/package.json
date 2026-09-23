@@ -1,6 +1,6 @@
 {
   "name": "pinion-email",
-  "version": "0.6.0",
+  "version": "0.7.1",
   "private": true,
   "license": "MIT",
   "engines": {
@@ -23,8 +23,10 @@
     "twenty-sdk": "2.39.0"
   },
   "devDependencies": {
+    "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^24.7.2",
     "@types/react": "^19.0.0",
+    "jsonwebtoken": "^9.0.3",
     "oxlint": "^0.16.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",

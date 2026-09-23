@@ -12,6 +12,7 @@ type HeraldWebhookBody = {
     source?: string;
     recipient?: string;
     messageRef?: string;
+    sentBy?: string | null;
     url?: string | null;
     openedAt?: string;
     clickedAt?: string;
@@ -70,6 +71,10 @@ const handler = async (payload: RoutePayload<HeraldWebhookBody>) => {
           kind,
           recipient,
           messageRef: body.data?.messageRef ?? '',
+          // Scopes the row to the AM who sent the message. Without it
+          // rules.js has nothing to bind OWN('sentBy') to and the event is
+          // invisible to the only person entitled to see it.
+          sentById: body.data?.sentBy ?? null,
           occurredAt:
             body.data?.openedAt ?? body.data?.clickedAt ?? body.timestamp ?? new Date().toISOString(),
           url: body.data?.url ?? '',

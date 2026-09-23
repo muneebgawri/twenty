@@ -1,9 +1,16 @@
 import { useCallback, useEffect, useState } from 'react';
-import { composeSignature } from 'src/utils/compose-signature';
+import {
+  composeSignature,
+  withTrackingPixel,
+} from 'src/utils/compose-signature';
 import { CoreApiClient } from 'twenty-client-sdk/core';
+import { RestApiClient } from 'twenty-client-sdk/rest';
 import { MetadataApiClient } from 'twenty-client-sdk/metadata';
 import { defineFrontComponent } from 'twenty-sdk/define';
-import { useSelectedRecordIds } from 'twenty-sdk/front-component';
+import {
+  useSelectedRecordIds,
+  useUserId,
+} from 'twenty-sdk/front-component';
 
 export const COMPOSER_FRONT_COMPONENT_UNIVERSAL_IDENTIFIER =
   '2e7b4d16-9c83-4f50-a6d1-3b8e5c7f0a92';
@@ -59,6 +66,7 @@ const HINT: React.CSSProperties = { color: '#667085', fontSize: 13 };
  */
 const Composer = () => {
   const selectedRecordIds = useSelectedRecordIds();
+  const userId = useUserId();
 
   const [mailboxes, setMailboxes] = useState<Mailbox[]>([]);
   const [from, setFrom] = useState<string | null>(null);
@@ -70,6 +78,11 @@ const Composer = () => {
   const [branding, setBranding] = useState<Record<string, unknown>>({});
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
+  // OFF by default and per send. An open pixel on a UK press-relations
+  // CRM is a consent question, so it is never a stored preference that
+  // quietly applies to everybody (PRD §4.2).
+  const [trackOpens, setTrackOpens] = useState(false);
+  const [workspaceMemberId, setWorkspaceMemberId] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -115,6 +128,20 @@ const Composer = () => {
       setSignatures(byAccount);
       setBranding(data.emailSignatureSettings?.edges?.[0]?.node ?? {});
 
+      // The row-security rule binds on workspaceMember, not user, so the
+      // event has to carry the member id rather than the user id.
+      try {
+        const members: any = await core.query({
+          workspaceMembers: {
+            __args: { filter: { userId: { eq: userId } }, first: 1 },
+            edges: { node: { id: true } },
+          },
+        } as any);
+        setWorkspaceMemberId(members.workspaceMembers?.edges?.[0]?.node?.id ?? null);
+      } catch {
+        // Tracking simply stays unavailable; the composer still sends.
+      }
+
       // Prefill the recipient from the person the command was opened on.
       //
       // In its OWN try/catch on purpose: a convenience must not be able to
@@ -147,7 +174,7 @@ const Composer = () => {
     } finally {
       setLoading(false);
     }
-  }, [selectedRecordIds]);
+  }, [selectedRecordIds, userId]);
 
   useEffect(() => {
     void load();
@@ -178,7 +205,11 @@ const Composer = () => {
     setError(null);
 
     const failures: string[] = [];
+    const notes = new Set<string>();
     let sent = 0;
+
+    // Groups every tracking event for this send, across all its recipients.
+    const messageRef = `tw-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
     // One message per recipient, not one with everyone in `to`. A press
     // contact must not see who else was pitched, and the unsubscribe link is
@@ -190,7 +221,32 @@ const Composer = () => {
         branding,
         recipient,
       );
-      const html = signature.length > 0 ? `${body}<br><br>${signature}` : body;
+      let html = signature.length > 0 ? `${body}<br><br>${signature}` : body;
+
+      // Minted per recipient, server side -- the signing key cannot come to a
+      // browser. A failure here must not stop the send: tracking is the
+      // optional part, so the email goes out untracked rather than not at all.
+      if (trackOpens) {
+        try {
+          const minted: any = await new RestApiClient().post(
+            '/s/pinion/mint-tracking',
+            {
+              body: {
+                recipient,
+                messageRef,
+                sentBy: workspaceMemberId ?? undefined,
+              },
+            },
+          );
+          if (minted?.configured === true && minted.openUrl) {
+            html = withTrackingPixel(html, minted.openUrl);
+          } else if (minted?.configured === false) {
+            notes.add('tracking is not configured — sent untracked');
+          }
+        } catch (cause) {
+          notes.add(`tracking failed (${(cause as Error).message}) — sent untracked`);
+        }
+      }
 
       try {
         const result: any = await new MetadataApiClient().mutation({
@@ -221,7 +277,9 @@ const Composer = () => {
     }
 
     setSending(false);
-    setStatus(`Sent ${sent} of ${recipients.length}`);
+    setStatus(
+      [`Sent ${sent} of ${recipients.length}`, ...notes].join(' · '),
+    );
     if (failures.length > 0) {
       setError(failures.join(' · '));
     }
@@ -312,6 +370,29 @@ const Composer = () => {
       />
       <p style={HINT}>
         HTML is sent as written. Your signature is added automatically.
+      </p>
+
+      <label
+        style={{
+          marginTop: 16,
+          display: 'flex',
+          gap: 8,
+          alignItems: 'center',
+          cursor: 'pointer',
+        }}
+      >
+        <input
+          type="checkbox"
+          checked={trackOpens}
+          onChange={(event) => setTrackOpens(event.target.checked)}
+          style={{ colorScheme: 'light dark' }}
+        />
+        Track opens for this message
+      </label>
+      <p style={HINT}>
+        Off unless you tick it, every time. Adds an invisible image that tells
+        us when the message is opened — think about whether this recipient
+        would expect that.
       </p>
 
       <details style={{ marginTop: 12 }}>
