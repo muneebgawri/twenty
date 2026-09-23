@@ -257,10 +257,13 @@ const RULES = {
   // lookup, so hiding it is the riskier choice, not the safer-seeming one.
   //
   // It leaks the EXISTENCE of records a member cannot read -- opaque ids, no
-  // content. Accepted for now because the table is empty and nothing uses
-  // sharing yet. REVISIT the moment it is used in anger: if sharing is adopted
-  // and this turns out not to be read through the restricted path, HIDDEN
-  // becomes both safe and correct.
+  // content. Accepted because the table cannot fill: RecordSharingFeatureService
+  // requires BOTH the IS_RECORD_SHARING_ENABLED workspace flag AND a
+  // RECORD_SHARING billing entitlement, and with billing off this instance
+  // registers NoRecordSharingEntitlementProvider, which answers false for every
+  // workspace. Nothing can write a row here until that changes. REVISIT the
+  // moment it does: if sharing is adopted and this turns out not to be read
+  // through the restricted path, HIDDEN becomes both safe and correct.
   recordShare: VISIBLE,
 
   // --- calendar contents ---------------------------------------------------
