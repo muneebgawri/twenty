@@ -1,6 +1,6 @@
 # PRD — Email productivity in Twenty (scheduling, tracking, signatures)
 
-**Status:** approved to build. §7 experiments run 2026-09-23 — 7.2 answered and §4.2 revised; 7.1 blocked on a staging worker. Feature code not started.
+**Status:** approved to build. §7 experiments both answered 2026-09-23 — §4.2 revised, §4.1 patch confirmed necessary. Feature code not started.
 **Audience:** whoever builds this. Assumes you know React and GraphQL, assumes you know nothing about this Twenty deployment.
 **Supersedes:** PR #1 (`feature/crm-wishlist`), which is architecturally incompatible — see §9.
 
@@ -143,7 +143,8 @@ Verified capabilities:
   `MetadataApiClient`. Permissions come from the app's `defineApplicationRole`.
 - **Cron.** A per-minute scheduler walks every logic function with
   `cronTriggerSettings: { pattern }`. **Confirmed live in production** — `truncateStale`
-  runs at `0 3 * * *`.
+  runs at `0 3 * * *` — and on staging since 2026-09-23. The invocation carries **no user
+  context and an empty payload** (§7.1), which is what forces the overlay patch in §4.1.
 - **Public unauthenticated HTTP routes.** `httpRouteTriggerSettings` with
   `isAuthRequired: false`, served under `/s/<path>`. **Confirmed live in production**: a GET
   to an unregistered path returns a structured `TRIGGER_NOT_FOUND` from the route-trigger
@@ -197,7 +198,8 @@ supported.')` when `request.userWorkspaceId` is absent — **during argument res
 before the method body runs.** You cannot patch around it by editing the resolver body.
 
 **Consequence:** send-now from our own composer works today with no patch. Send-later does
-not, because cron has no user. This is what §4.1 solves.
+not, because cron has no user — **measured, not inferred** (§7.1: `userWorkspaceId` absent
+from an empty cron payload). This is what §4.1 solves.
 
 ### 3.7 Row security — do not skip this
 
@@ -394,32 +396,45 @@ production and looked at.
 
 ## 7. Experiments — RESULTS (run 2026-09-23 on staging)
 
-Both were run with a throwaway app, `route-probe`, four logic functions, five
-deploy iterations. **7.2 is answered and changes the design. 7.1 is blocked on
-infrastructure, not on Twenty.**
+Both were run with a throwaway app, `route-probe`, five logic functions, six
+deploy iterations. **Both are answered. 7.2 changes the tracking design; 7.1
+confirms the overlay patch is unavoidable.**
 
-### 7.1 — Does a cron logic function have user context? **UNANSWERED — cannot be tested on staging.**
+### 7.1 — Does a cron logic function have user context? **ANSWERED: NO.**
 
-`staging has no worker container.` Production runs `twenty-worker-1`; staging
-runs only `twenty-staging-server-1`, `-db-1` and `-redis-1`. Cron fires in the
-worker, so **no cron job can ever run on staging as currently configured.**
+```json
+{ "observedAt": "2026-09-23T12:58:01.700Z",
+  "userWorkspaceId": null,
+  "hasUserWorkspaceIdKey": false,
+  "contextKeys": null,
+  "payloadKeys": [] }
+```
 
-Proven, not assumed: `probe-cron` registered correctly — `core."logicFunction"`
-on staging holds `probe-cron | {"pattern": "* * * * *"}` — and after 15 minutes
-`core."keyValuePair"` still held no observation.
+Not merely null — **the key is not present**, there is no `context` object, and the
+cron payload is **entirely empty**. Observed repeatedly, once a minute.
 
-This invalidates part of §6: *"the app installs cleanly on staging first"* cannot
-cover **any** cron-dependent behaviour, which is all of feature A. Either stand
-up a staging worker, or accept that scheduled send is first exercised in
-production.
+**Feature A needs the overlay patch, and §4.1's security note stands as written.**
+The hoped-for shortcut does not exist: `LogicFunctionExecutionContext` types
+`userWorkspaceId`, but that is populated for *user-initiated* invocations, and a
+cron invocation has no user to propagate. Design accordingly and do not revisit.
 
-To answer 7.1, pick one:
-- **start a worker on staging** (also restores staging as a real rehearsal for
-  feature A), or
-- **install `route-probe` on production** — it has no record permissions at all,
-  writes one kv key and serves four `/s/probe/*` routes.
+**Staging can now run cron.** The blocker was never Twenty: `docker-compose.yml`
+at `/opt/twenty-staging/` **already defined a worker service**, which had sat in
+state `created` since 2026-09-21 — an interrupted `up`, never started. Started
+2026-09-23; it drained a 37-hour backlog (`cron-queue` 1,000 completed) and now
+executes logic functions normally. §6's "installs cleanly on staging first" is
+therefore sound again and does cover feature A.
 
-The prior is still that cron has no user context; nothing here contradicts it.
+If cron appears not to fire on staging, check `docker compose ps -a` for a
+worker in state `created` before suspecting anything in the app. Two readings of
+an empty result here were mistaken for a broken `kv`; the cron simply had not
+run yet.
+
+**`kv` works and persists to `core."keyValuePair"`** (plain JSON, not encrypted —
+unlike `core."applicationVariable"`, which holds `enc:v2:` secrets). It is a
+get/set/delete store with no query capability, so it suits a single observation
+or a cursor, **not** the scheduled-send queue — keep that an app-owned object as
+§4.0 has it.
 
 ### 7.2 — What can a PUBLIC `httpRoute` return? **ANSWERED.**
 
