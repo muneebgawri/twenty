@@ -10,6 +10,36 @@ this ships the skeleton they all sit on.
 - A **Settings** page listing the signed-in user's connected mailboxes, with a
   signature per mailbox.
 
+## Where the settings page actually is
+
+**Settings → Apps → Pinion email → Settings tab.** It is not a Settings sidebar
+entry, and nothing in the sidebar hints at it — `defineSettingsFrontComponent`
+renders inside the application's own detail page, under its "Auto-upgrade" row.
+The first person to look for it reported it missing while it was installed and
+working, so point people at the path rather than the feature name.
+
+## The two permission grants, and why they are not obvious
+
+Both presented as the same runtime message:
+
+> Entity performing the request does not have permission
+
+That names the **application**, not the signed-in user. The component calls the
+API with the user's token, so the call looks like one an admin is plainly
+entitled to make — but Twenty checks the app's own grants as well.
+
+| Grant | Without it |
+|---|---|
+| `SystemPermissionFlag.CONNECTED_ACCOUNTS` | `myConnectedAccounts` fails, so no mailbox list |
+| `objectPermissions` on `emailSignature` | the app cannot read **its own object** |
+
+Owning an object does not imply being able to read it. The grant is scoped to
+that one object rather than `canReadAllObjectRecords`, because this app has no
+business reading people or companies and the public tracking routes in PRD §4.2
+will run under the same role.
+
+Neither the manifest build, the typecheck nor the install warns about either.
+
 ## Why the signature is not a field on the mailbox
 
 `connectedAccount` is a core TypeORM entity, not an object — it is absent from
@@ -61,6 +91,14 @@ deploy that did nothing.
 
 `yarn install` needs the empty `yarn.lock` in this directory. Without it yarn
 treats the app as part of the repo-root workspace and refuses to install.
+
+**If `deploy` fails with `ETIMEDOUT` / `EHOSTUNREACH` on Cloudflare IPs** while
+`curl` to the same host works, it is Node's happy-eyeballs picking unreachable
+IPv6, not the server:
+
+```bash
+NODE_OPTIONS="--no-network-family-autoselection" yarn twenty deploy -r staging
+```
 
 ## Verified against staging
 

@@ -1,17 +1,25 @@
-import { defineRole } from 'twenty-sdk/define';
+import { defineRole, SystemPermissionFlag } from 'twenty-sdk/define';
+import { EMAIL_SIGNATURE_OBJECT_UNIVERSAL_IDENTIFIER } from 'src/objects/email-signature';
 
 export const DEFAULT_ROLE_UNIVERSAL_IDENTIFIER =
   '8b3d1f6a-27c4-4e59-9a80-5f2c7d4e1b93';
 
-// The role this app's logic functions run as. Step 1 ships no logic functions
-// at all -- signatures are written by the settings front component, which runs
-// as the signed-in user and not as this role.
+// The role this app runs under. Both grants below were found the same way: the
+// settings page rendered, listed nothing and showed "Entity performing the
+// request does not have permission" -- a message that names the APPLICATION,
+// not the signed-in user, which is why it is confusing. The component calls the
+// API with the user's token, so the call looks like one the user is plainly
+// entitled to make; Twenty checks what the app was granted as well.
 //
-// Kept deliberately empty so the role grows with the features that need it:
-// scheduled send (§4.1) will need read/write on the app's own queue object,
-// and the public tracking routes (§4.2) must have no record access beyond
-// their own event object. Granting it up front and trimming later never
-// happens.
+// CONNECTED_ACCOUNTS covers `myConnectedAccounts`, the only way to learn which
+// mailboxes exist (§3.5).
+//
+// objectPermissions covers the app's OWN object. Owning emailSignature does not
+// imply being able to read it: with no grant the list query fails, and the page
+// cannot show or save a signature. Scoped to that one object rather than
+// flipping canReadAllObjectRecords, because this app has no business reading
+// people or companies and the public tracking routes in §4.2 will run under
+// this same role.
 export default defineRole({
   universalIdentifier: DEFAULT_ROLE_UNIVERSAL_IDENTIFIER,
   label: 'Pinion email default function role',
@@ -20,4 +28,14 @@ export default defineRole({
   canUpdateAllObjectRecords: false,
   canSoftDeleteAllObjectRecords: false,
   canDestroyAllObjectRecords: false,
+  permissionFlagUniversalIdentifiers: [SystemPermissionFlag.CONNECTED_ACCOUNTS],
+  objectPermissions: [
+    {
+      objectUniversalIdentifier: EMAIL_SIGNATURE_OBJECT_UNIVERSAL_IDENTIFIER,
+      canReadObjectRecords: true,
+      canUpdateObjectRecords: true,
+      canSoftDeleteObjectRecords: true,
+      canDestroyObjectRecords: false,
+    },
+  ],
 });

@@ -124,11 +124,29 @@ function*, not a trigger type you declare separately (§3.4).
 - **They call the API directly** via `new CoreApiClient().query({...}) / .mutation({...})`
   from `twenty-client-sdk`. Hooks like `useRecordId()` come from `twenty-sdk/front-component`.
 - **Their token carries USER context.** This is the important one — see §3.6.
+- **A user token is NOT sufficient on its own.** Twenty also checks what the
+  *application* was granted, and refuses with **"Entity performing the request does not
+  have permission"** — a message that names the app, not the signed-in user, so it reads
+  like a user-permission problem and is not. Two grants were needed before the signatures
+  page worked, and each one presented as the same message:
+  - `permissionFlagUniversalIdentifiers: [SystemPermissionFlag.CONNECTED_ACCOUNTS]` for
+    `myConnectedAccounts`;
+  - `objectPermissions: [{ objectUniversalIdentifier: <the app's own object>,
+    canReadObjectRecords: true, ... }]` — **owning an object does not imply being able to
+    read it.** Prefer this over `canReadAllObjectRecords`, which grants every object.
+
+  Budget for finding these by deploying and reading the rendered error. Nothing in the
+  manifest, the typecheck or the install warns you.
 - **They can call a logic function.** The REST client routes `/s/...` paths to the functions
   base URL and picks the token by `runAs`; the default is the **user-scoped** token.
 - **There is no placement field on the manifest.** Where a component appears is decided from
   the other side — by a page layout tab, a command menu item, a nav menu item, or a settings
   page. Four mounting options, all proven in the two apps above.
+- **A `defineSettingsFrontComponent` does NOT get its own Settings sidebar entry.** It
+  renders at **Settings → Apps → \<app\> → Settings tab**, below the app's own
+  "Auto-upgrade" row. Nobody finds that by looking, so say where it is when handing a
+  feature over — the first reviewer of this app reported the page missing when it was
+  installed and working.
 
 **There is no extension point in Twenty's native email composer.** `useSendEmail.ts` and
 `useEmailComposerState.ts` read no front-component metadata. An app can only ship *its own*
