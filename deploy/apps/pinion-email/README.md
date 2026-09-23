@@ -113,6 +113,16 @@ Run for real, not against a mock (PRD §3.8 #7):
 | coverage check | 0 unclassified |
 | re-install same version | refused, object not duplicated |
 
-**Not yet verified:** the settings page itself. `myConnectedAccounts` requires
-user context, so it cannot be exercised with an API key — it needs a browser
-session on staging. Do that before calling step 1 done.
+Checked in a browser on staging: the page loads, both queries succeed, and it
+renders its empty state — which is the correct answer there, because staging
+has no connected mailboxes.
+
+**Still unverified: the editor itself** (mailbox dropdown, textarea, save). It
+only renders once `myConnectedAccounts` returns something, so it needs one
+connected mailbox on staging.
+
+Google auth is now configured there for exactly that purpose — the Pinion CRM
+OAuth client carries staging's redirect URIs as of 2026-09-23, and staging
+advertises `google: true` alongside `password: true`. What remains is a person
+clicking **Settings → Accounts → Connect account** and approving it with a
+Google account; that is a sign-in and cannot be automated.
