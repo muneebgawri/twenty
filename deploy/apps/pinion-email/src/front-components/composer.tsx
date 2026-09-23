@@ -227,21 +227,39 @@ const Composer = () => {
       // browser. A failure here must not stop the send: tracking is the
       // optional part, so the email goes out untracked rather than not at all.
       if (trackOpens) {
+        // Success is the ONLY path that says nothing. The first version
+        // reported only two outcomes -- configured:false, or a thrown error --
+        // so an unexpected response shape fell through both, added no pixel,
+        // and still said "Sent 1 of 1". The email went out untracked and
+        // looked identical to one that had not.
         try {
-          const minted: any = await new RestApiClient().post(
+          // post(path, BODY, options) -- the body is the second positional
+          // argument. Passing { body: ... } sends that wrapper as the body, so
+          // the handler reads payload.body.body and sees no recipient. Nothing
+          // catches it: `body` is typed `unknown`, so the wrong shape compiles
+          // and the route answers 200 with an error field.
+          const response: any = await new RestApiClient().post(
             '/s/pinion/mint-tracking',
             {
-              body: {
-                recipient,
-                messageRef,
-                sentBy: workspaceMemberId ?? undefined,
-              },
+              recipient,
+              messageRef,
+              sentBy: workspaceMemberId ?? undefined,
             },
           );
-          if (minted?.configured === true && minted.openUrl) {
+          // The REST client has wrapped a handler's return before; unwrap one
+          // level rather than assume either shape.
+          const minted = response?.openUrl || response?.configured !== undefined
+            ? response
+            : (response?.data ?? response);
+
+          if (minted?.openUrl) {
             html = withTrackingPixel(html, minted.openUrl);
           } else if (minted?.configured === false) {
-            notes.add('tracking is not configured — sent untracked');
+            notes.add('tracking not configured — sent untracked');
+          } else {
+            notes.add(
+              `tracking returned no URL (${JSON.stringify(minted).slice(0, 120)}) — sent untracked`,
+            );
           }
         } catch (cause) {
           notes.add(`tracking failed (${(cause as Error).message}) — sent untracked`);
