@@ -246,6 +246,23 @@ const RULES = {
   // requires passing the `message` rule above.
   messageChannelMessageAssociation: VISIBLE,
 
+  // Twenty's OWN record sharing, new in v2.41. A grant: which principal may
+  // reach which record, at what access level, and why. No customer data --
+  // ids, an access level, a cause.
+  //
+  // VISIBLE for the same reason messageChannelMessageAssociation is, and that
+  // precedent is the whole argument. Hiding a table the permission system
+  // itself reads does not protect anything; it breaks the feature and the
+  // breakage looks like the feature never worked. This one is a permission
+  // lookup, so hiding it is the riskier choice, not the safer-seeming one.
+  //
+  // It leaks the EXISTENCE of records a member cannot read -- opaque ids, no
+  // content. Accepted for now because the table is empty and nothing uses
+  // sharing yet. REVISIT the moment it is used in anger: if sharing is adopted
+  // and this turns out not to be read through the restricted path, HIDDEN
+  // becomes both safe and correct.
+  recordShare: VISIBLE,
+
   // --- calendar contents ---------------------------------------------------
   // Still hidden: no ownership column, and nothing has asked for it.
   calendarEvent: HIDDEN,
