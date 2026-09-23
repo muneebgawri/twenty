@@ -169,6 +169,18 @@ const RULES = {
   // explain why.
   leadLookupRequest: CREATOR,
 
+  // A signature belongs to the mailbox its author connected, so CREATOR is the
+  // exact rule rather than an approximation: the AM who writes one is the only
+  // person it applies to. There is no owner column to use instead --
+  // connectedAccount is not an object, so the row keys a plain TEXT
+  // connectedAccountId and has no relation to follow.
+  //
+  // A signature is not sensitive the way a contact is, but it is personal and
+  // there is no reason for AMs to read each other's. The app's own logic
+  // functions read it under the app role, which this map does not constrain,
+  // so scoping it here costs the send path nothing.
+  emailSignature: CREATOR,
+
   // Journalists scraped by Crawlix. A shared research pool, not a book of
   // business: nobody owns a journalist, and two AMs pitching the same reporter
   // different clients is normal press relations rather than poaching. So

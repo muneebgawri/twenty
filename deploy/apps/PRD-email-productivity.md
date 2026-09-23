@@ -178,6 +178,20 @@ only for `serverRouteTriggerSettings` handlers, and `ServerRouteTriggerSettings`
   from `STANDARD_OBJECTS`. **You cannot add a signature field to it.** Signatures must live
   in an app-owned object keyed by `connectedAccountId` (§4.3).
 
+  **But the UI can still discover those ids** — `myConnectedAccounts` on the **metadata**
+  endpoint returns `ConnectedAccountPublicDTO`: `id`, `handle`, `provider`,
+  `userWorkspaceId`, `authFailedAt`, `archivedAt`. Verified against staging. Without this
+  the settings page has no way to name a mailbox and §4.3 is unbuildable, so it is worth
+  stating explicitly.
+
+  It is gated exactly like `sendEmail` — an API key gets *"This endpoint requires a user
+  context. API keys are not supported."* So a **front component can call it and cron
+  cannot**, which is why §4.1 stores `connectedAccountId` on the queue row at compose time
+  rather than resolving it at send time.
+
+  Neither `connectedAccount` nor `messageChannel` is queryable on the **core** endpoint —
+  its root Query is records-only (101 fields, no `currentUser`). Do not go looking there.
+
 ### 3.6 Auth — the model that decides this whole design
 
 This is the crux. Read it twice.
