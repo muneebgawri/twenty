@@ -368,6 +368,57 @@ read-modify-write race that downgraded CLICKED back to OPENED.
 - Return the GIF even for an unknown token, or you leak record existence to anyone holding
   any valid signature.
 
+### 4.2.1 Herald already does all of this — read before building anything
+
+Discovered 2026-09-23 while starting step 3. `apps/api/src/public/tracking.controller.ts`
+in Herald already implements **both** halves, in production:
+
+| | |
+|---|---|
+| `GET /public/track/open?t=` | verifies the token, records an `openEvent`, stamps `sendEvent.openedAt`, fires an `email.opened` webhook, syncs to the CRM, and **returns the pixel** — including when the token is missing or invalid |
+| `GET /public/track/click?t=` | records a `clickEvent`, stamps `clickedAt`, and **302s to the destination** |
+
+Two things fall out of that:
+
+1. **Click tracking's 302 is not a problem at all.** Herald is plain Express and sets
+   `Location` normally. The §7.2 workaround (an HTML interstitial) is only needed if the
+   redirect comes from Twenty, and it does not have to.
+2. **The read-modify-write race PR #1 had is already solved here.** Herald refuses to
+   downgrade a `REPLIED`/`BOUNCED` send to `OPENED`/`CLICKED`. Copy that rule; do not
+   reinvent it.
+
+**But it cannot be reused as-is**, for two specific reasons, both checked:
+
+- `SendEvent.campaignId` is **required** (`String`, not `String?`). A message sent from
+  Twenty's composer belongs to no campaign, so it cannot create a `SendEvent` — and
+  every tracking token is keyed on one.
+- `CrmService.syncLead` targets **HubSpot, Pipedrive or a generic webhook**. It does not
+  target Twenty, so reusing it would not put anything in front of an AM.
+
+**Herald can already write to Twenty**, though: `apps/api/src/twenty-sync/twenty-graphql.client.ts`
+holds a rate-limited client with `TWENTY_WRITE_API_KEY`. So the missing piece is small and
+sits in Herald, not Twenty.
+
+#### The fork, stated plainly
+
+**Option A — Twenty owns tracking, Herald serves only bytes.** An app-owned
+`emailTrackingEvent` object and a public Twenty route. Self-contained, no Herald migration.
+But the pixel URL has to be ONE url that both records the open and returns a valid GIF, and
+a Twenty route cannot return the GIF — so Herald has to be in the path anyway, forwarding to
+Twenty. Two hops for every open, and opens live apart from campaign reporting.
+
+**Option B — Herald owns tracking, and pushes the event into Twenty.** A small
+`ExternalSendEvent` table (no campaign), the composer asks Herald to mint the URLs, and
+Herald records the open/click and writes it into Twenty with the client it already has.
+Reuses the pixel, the real 302, the token signing, the no-downgrade rule and the Twenty
+write path. Costs one migration on Herald's production schema.
+
+**Recommended: B.** A carries the same Herald dependency without any of the reuse, and
+leaves tracking split across two systems. B needs a decision from whoever owns Herald's
+schema before it starts.
+
+---
+
 **Resolved by §7.2 — read it before building this.** Click tracking is *not* blocked, but
 neither endpoint works as drafted above:
 
