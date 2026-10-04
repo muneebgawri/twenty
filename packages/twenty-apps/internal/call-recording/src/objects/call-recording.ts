@@ -27,6 +27,18 @@ export const SUMMARY_FIELD_UNIVERSAL_IDENTIFIER =
 export const STATUS_FIELD_UNIVERSAL_IDENTIFIER =
   '24c92ad0-4559-4bf9-a9fa-09168914a142';
 
+export const PROVIDER_CALL_ID_FIELD_UNIVERSAL_IDENTIFIER =
+  'b433dcb4-0c24-4a3f-99b6-91273cc8b945';
+
+export const DIRECTION_FIELD_UNIVERSAL_IDENTIFIER =
+  '4f719f83-a375-4161-87e2-c46bcf81b922';
+
+export const PHONE_NUMBER_FIELD_UNIVERSAL_IDENTIFIER =
+  'eb97a9ea-47b6-49ba-b2a9-df19e27528ad';
+
+export const DURATION_SECONDS_FIELD_UNIVERSAL_IDENTIFIER =
+  'ee766824-af68-45d7-ab65-a207a060162d';
+
 export default defineObject({
   universalIdentifier: CALL_RECORDING_OBJECT_UNIVERSAL_IDENTIFIER,
   nameSingular: 'callRecording',
@@ -35,7 +47,8 @@ export default defineObject({
   labelPlural: 'Call recordings',
   description: 'A recorded call',
   icon: 'IconPhone',
-  labelIdentifierFieldMetadataUniversalIdentifier: NAME_FIELD_UNIVERSAL_IDENTIFIER,
+  labelIdentifierFieldMetadataUniversalIdentifier:
+    NAME_FIELD_UNIVERSAL_IDENTIFIER,
   fields: [
     {
       universalIdentifier: NAME_FIELD_UNIVERSAL_IDENTIFIER,
@@ -119,6 +132,54 @@ export default defineObject({
       label: 'Summary',
       description: 'AI-generated summary of the call',
       icon: 'IconSparkles',
+    },
+    {
+      universalIdentifier: PROVIDER_CALL_ID_FIELD_UNIVERSAL_IDENTIFIER,
+      type: FieldType.TEXT,
+      name: 'providerCallId',
+      label: 'OpenPhone call ID',
+      description: 'Unique call identifier received from OpenPhone / Quo',
+      icon: 'IconHash',
+    },
+    {
+      universalIdentifier: DIRECTION_FIELD_UNIVERSAL_IDENTIFIER,
+      type: FieldType.SELECT,
+      name: 'direction',
+      label: 'Direction',
+      description: 'Incoming or outgoing call',
+      icon: 'IconDirection',
+      options: [
+        {
+          id: 'd477d30c-7cc9-4b91-b38b-7e9ec0a7859e',
+          value: 'INCOMING',
+          label: 'Incoming',
+          position: 0,
+          color: 'green',
+        },
+        {
+          id: '7a2ec701-1055-4e05-9860-59c4ebf35274',
+          value: 'OUTGOING',
+          label: 'Outgoing',
+          position: 1,
+          color: 'blue',
+        },
+      ],
+    },
+    {
+      universalIdentifier: PHONE_NUMBER_FIELD_UNIVERSAL_IDENTIFIER,
+      type: FieldType.TEXT,
+      name: 'phoneNumber',
+      label: 'Contact phone',
+      description: 'External caller or recipient phone number',
+      icon: 'IconPhone',
+    },
+    {
+      universalIdentifier: DURATION_SECONDS_FIELD_UNIVERSAL_IDENTIFIER,
+      type: FieldType.NUMBER,
+      name: 'durationSeconds',
+      label: 'Duration (seconds)',
+      description: 'Call duration reported by OpenPhone / Quo',
+      icon: 'IconClock',
     },
   ],
 });

@@ -3,6 +3,7 @@ import { styled } from '@linaria/react';
 import { type MessageChannel } from '@/accounts/types/MessageChannel';
 import { UPDATE_MESSAGE_CHANNEL } from '@/settings/accounts/graphql/mutations/updateMessageChannel';
 import { useMutation } from '@apollo/client/react';
+import { SettingsAccountsEmailSignature } from '@/settings/accounts/components/SettingsAccountsEmailSignature';
 import { SettingsAccountsMessageAutoCreationCard } from '@/settings/accounts/components/SettingsAccountsMessageAutoCreationCard';
 import { SettingsAccountsMessageFolderCard } from '@/settings/accounts/components/SettingsAccountsMessageFolderCard';
 import { SettingsAccountsMessageVisibilityCard } from '@/settings/accounts/components/SettingsAccountsMessageVisibilityCard';
@@ -27,6 +28,8 @@ type SettingsAccountsMessageChannelDetailsProps = {
     | 'excludeGroupEmails'
     | 'isSyncEnabled'
     | 'messageFolderImportPolicy'
+    | 'connectedAccountId'
+    | 'handle'
   >;
 };
 
@@ -73,6 +76,10 @@ export const SettingsAccountsMessageChannelDetails = ({
 
   return (
     <StyledDetailsContainer>
+      <SettingsAccountsEmailSignature
+        connectedAccountId={messageChannel.connectedAccountId}
+        handle={messageChannel.handle}
+      />
       <Section>
         <H2Title
           title={t`Import`}

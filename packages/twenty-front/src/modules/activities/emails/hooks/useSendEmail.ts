@@ -9,10 +9,18 @@ import { getTimelineThreadsFromPersonId } from '@/activities/emails/graphql/quer
 import { useApolloCoreClient } from '@/object-metadata/hooks/useApolloCoreClient';
 import { useSnackBar } from '@/ui/feedback/snack-bar-manager/hooks/useSnackBar';
 import { t } from '@lingui/core/macro';
-import {
-  type SendEmailMutation,
-  type SendEmailMutationVariables,
-} from '~/generated-metadata/graphql';
+
+type SendEmailMutationData = {
+  sendEmail: {
+    success: boolean;
+    error?: string | null;
+    scheduledAt?: string | null;
+  };
+};
+
+type SendEmailMutationVariables = {
+  input: SendEmailParams;
+};
 
 type SendEmailParams = {
   connectedAccountId: string;
@@ -23,13 +31,15 @@ type SendEmailParams = {
   body: string;
   inReplyTo?: string;
   files?: EmailAttachment[];
+  scheduledAt?: string;
+  trackEmail?: boolean;
 };
 
 export const useSendEmail = () => {
   const apolloCoreClient = useApolloCoreClient();
 
   const [sendEmailMutation, { loading }] = useMutation<
-    SendEmailMutation,
+    SendEmailMutationData,
     SendEmailMutationVariables
   >(SEND_EMAIL);
 
@@ -49,13 +59,17 @@ export const useSendEmail = () => {
               body: params.body,
               inReplyTo: params.inReplyTo,
               files: params.files,
+              scheduledAt: params.scheduledAt,
+              trackEmail: params.trackEmail,
             },
           },
         });
 
         if (result.data?.sendEmail.success) {
           enqueueSuccessSnackBar({
-            message: t`Email sent successfully`,
+            message: result.data.sendEmail.scheduledAt
+              ? t`Email scheduled successfully`
+              : t`Email sent successfully`,
           });
 
           await apolloCoreClient.refetchQueries({

@@ -1,6 +1,20 @@
 import { WORKSPACE_MEMBERS_ON_CALL_RECORDING_ID } from 'src/fields/workspace-members-on-call-recording.field';
 import { PEOPLE_ON_CALL_RECORDING_ID } from 'src/fields/people-on-call-recording.field';
-import { CALL_RECORDING_OBJECT_UNIVERSAL_IDENTIFIER, CREATED_AT_FIELD_UNIVERSAL_IDENTIFIER, ENDED_AT_FIELD_UNIVERSAL_IDENTIFIER, NAME_FIELD_UNIVERSAL_IDENTIFIER, RECORDING_FILE_FIELD_UNIVERSAL_IDENTIFIER, STATUS_FIELD_UNIVERSAL_IDENTIFIER, SUMMARY_FIELD_UNIVERSAL_IDENTIFIER, TRANSCRIPT_FIELD_UNIVERSAL_IDENTIFIER, TRANSCRIPT_FILE_FIELD_UNIVERSAL_IDENTIFIER } from 'src/objects/call-recording';
+import {
+  CALL_RECORDING_OBJECT_UNIVERSAL_IDENTIFIER,
+  CREATED_AT_FIELD_UNIVERSAL_IDENTIFIER,
+  DIRECTION_FIELD_UNIVERSAL_IDENTIFIER,
+  DURATION_SECONDS_FIELD_UNIVERSAL_IDENTIFIER,
+  ENDED_AT_FIELD_UNIVERSAL_IDENTIFIER,
+  NAME_FIELD_UNIVERSAL_IDENTIFIER,
+  PHONE_NUMBER_FIELD_UNIVERSAL_IDENTIFIER,
+  PROVIDER_CALL_ID_FIELD_UNIVERSAL_IDENTIFIER,
+  RECORDING_FILE_FIELD_UNIVERSAL_IDENTIFIER,
+  STATUS_FIELD_UNIVERSAL_IDENTIFIER,
+  SUMMARY_FIELD_UNIVERSAL_IDENTIFIER,
+  TRANSCRIPT_FIELD_UNIVERSAL_IDENTIFIER,
+  TRANSCRIPT_FILE_FIELD_UNIVERSAL_IDENTIFIER,
+} from 'src/objects/call-recording';
 import { defineView } from 'twenty-sdk';
 
 export const CALL_RECORDING_VIEW_UNIVERSAL_IDENTIFIER =
@@ -43,14 +57,16 @@ export default defineView({
     },
     {
       universalIdentifier: 'a7bce6c7-39ce-406a-bc6f-00b495951b4a',
-      fieldMetadataUniversalIdentifier: RECORDING_FILE_FIELD_UNIVERSAL_IDENTIFIER,
+      fieldMetadataUniversalIdentifier:
+        RECORDING_FILE_FIELD_UNIVERSAL_IDENTIFIER,
       isVisible: true,
       size: 12,
       position: 4,
     },
     {
       universalIdentifier: 'f3e2d1c0-a9b8-47c6-85d4-3e2f1a0b9c8d',
-      fieldMetadataUniversalIdentifier: TRANSCRIPT_FILE_FIELD_UNIVERSAL_IDENTIFIER,
+      fieldMetadataUniversalIdentifier:
+        TRANSCRIPT_FILE_FIELD_UNIVERSAL_IDENTIFIER,
       isVisible: true,
       size: 12,
       position: 5,
@@ -82,6 +98,36 @@ export default defineView({
       isVisible: true,
       size: 12,
       position: 6,
+    },
+    {
+      universalIdentifier: 'c18b837e-33be-4a58-a4cc-853020660aa2',
+      fieldMetadataUniversalIdentifier: DIRECTION_FIELD_UNIVERSAL_IDENTIFIER,
+      isVisible: true,
+      size: 12,
+      position: 9,
+    },
+    {
+      universalIdentifier: '65683352-acce-46bd-9d78-cf7cc4b89dda',
+      fieldMetadataUniversalIdentifier: PHONE_NUMBER_FIELD_UNIVERSAL_IDENTIFIER,
+      isVisible: true,
+      size: 12,
+      position: 10,
+    },
+    {
+      universalIdentifier: 'a501e5e5-609f-4500-89af-651b03a3a499',
+      fieldMetadataUniversalIdentifier:
+        DURATION_SECONDS_FIELD_UNIVERSAL_IDENTIFIER,
+      isVisible: true,
+      size: 12,
+      position: 11,
+    },
+    {
+      universalIdentifier: 'c3c643cc-8ec3-4bc6-ab21-b91c3fafb9b9',
+      fieldMetadataUniversalIdentifier:
+        PROVIDER_CALL_ID_FIELD_UNIVERSAL_IDENTIFIER,
+      isVisible: false,
+      size: 12,
+      position: 12,
     },
   ],
 });

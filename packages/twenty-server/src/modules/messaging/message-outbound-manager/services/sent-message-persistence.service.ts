@@ -6,6 +6,7 @@ import { v4 } from 'uuid';
 import { type ConnectedAccountEntity } from 'src/engine/metadata-modules/connected-account/entities/connected-account.entity';
 import { GlobalWorkspaceOrmManager } from 'src/engine/twenty-orm/global-workspace-datasource/global-workspace-orm.manager';
 import { buildSystemAuthContext } from 'src/engine/twenty-orm/utils/build-system-auth-context.util';
+import { MatchParticipantService } from 'src/modules/match-participant/match-participant.service';
 import { MessageDirection } from 'src/modules/messaging/common/enums/message-direction.enum';
 import { type MessageChannelMessageAssociationWorkspaceEntity } from 'src/modules/messaging/common/standard-objects/message-channel-message-association.workspace-entity';
 import { type MessageParticipantWorkspaceEntity } from 'src/modules/messaging/common/standard-objects/message-participant.workspace-entity';
@@ -14,6 +15,7 @@ import { type MessageWorkspaceEntity } from 'src/modules/messaging/common/standa
 import { type SendMessageResult } from 'src/modules/messaging/message-outbound-manager/types/send-message-result.type';
 
 type PersistSentMessageInput = {
+  messageId?: string;
   sendResult: SendMessageResult;
   subject: string;
   body: string;
@@ -22,6 +24,7 @@ type PersistSentMessageInput = {
   messageChannelId: string;
   inReplyTo?: string;
   workspaceId: string;
+  scheduledAt?: Date;
 };
 
 @Injectable()
@@ -30,72 +33,100 @@ export class SentMessagePersistenceService {
 
   constructor(
     private readonly globalWorkspaceOrmManager: GlobalWorkspaceOrmManager,
+    private readonly matchParticipantService: MatchParticipantService<MessageParticipantWorkspaceEntity>,
   ) {}
 
-  async persistSentMessage(input: PersistSentMessageInput): Promise<void> {
+  async persistSentMessage(input: PersistSentMessageInput): Promise<string> {
     const authContext = buildSystemAuthContext(input.workspaceId);
 
-    await this.globalWorkspaceOrmManager.executeInWorkspaceContext(async () => {
-      const messageRepository =
-        await this.globalWorkspaceOrmManager.getRepository<MessageWorkspaceEntity>(
-          input.workspaceId,
-          'message',
+    return await this.globalWorkspaceOrmManager.executeInWorkspaceContext(
+      async () => {
+        const messageRepository =
+          await this.globalWorkspaceOrmManager.getRepository<MessageWorkspaceEntity>(
+            input.workspaceId,
+            'message',
+          );
+
+        const messageThreadRepository =
+          await this.globalWorkspaceOrmManager.getRepository<MessageThreadWorkspaceEntity>(
+            input.workspaceId,
+            'messageThread',
+          );
+
+        const messageParticipantRepository =
+          await this.globalWorkspaceOrmManager.getRepository<MessageParticipantWorkspaceEntity>(
+            input.workspaceId,
+            'messageParticipant',
+          );
+
+        const associationRepository =
+          await this.globalWorkspaceOrmManager.getRepository<MessageChannelMessageAssociationWorkspaceEntity>(
+            input.workspaceId,
+            'messageChannelMessageAssociation',
+          );
+
+        const messageThreadId = await this.findOrCreateThread({
+          messageRepository,
+          messageThreadRepository,
+          inReplyTo: input.inReplyTo,
+          subject: input.subject,
+        });
+
+        const messageId = input.messageId ?? v4();
+        const sentAt = new Date();
+
+        await messageRepository.insert({
+          id: messageId,
+          headerMessageId: input.sendResult.headerMessageId,
+          subject: input.subject,
+          text: input.body,
+          receivedAt: sentAt,
+          deliveryStatus: 'SENT',
+          scheduledAt: input.scheduledAt ?? null,
+          sentAt,
+          firstOpenedAt: null,
+          lastClickedAt: null,
+          openCount: 0,
+          clickCount: 0,
+          messageThreadId,
+        });
+
+        const participants = this.buildParticipants(
+          messageId,
+          input.connectedAccount.handle ?? '',
+          input.recipients,
         );
 
-      const messageThreadRepository =
-        await this.globalWorkspaceOrmManager.getRepository<MessageThreadWorkspaceEntity>(
-          input.workspaceId,
-          'messageThread',
-        );
+        if (participants.length > 0) {
+          const createdParticipants =
+            await messageParticipantRepository.insert(participants);
 
-      const messageParticipantRepository =
-        await this.globalWorkspaceOrmManager.getRepository<MessageParticipantWorkspaceEntity>(
-          input.workspaceId,
-          'messageParticipant',
-        );
+          // Resolve each handle to the person and workspace member behind it,
+          // exactly as the import pipeline does in saveMessageParticipants.
+          // Without this a sent message carries bare email addresses: it never
+          // appears on the contact's record, and the sender is not linked to
+          // their own message, so anything scoped by participation — including
+          // the open and click counts above — cannot find it.
+          await this.matchParticipantService.matchParticipants({
+            participants: createdParticipants.raw ?? [],
+            objectMetadataName: 'messageParticipant',
+            matchWith: 'workspaceMemberAndPerson',
+            workspaceId: input.workspaceId,
+          });
+        }
 
-      const associationRepository =
-        await this.globalWorkspaceOrmManager.getRepository<MessageChannelMessageAssociationWorkspaceEntity>(
-          input.workspaceId,
-          'messageChannelMessageAssociation',
-        );
+        await associationRepository.insert({
+          messageChannelId: input.messageChannelId,
+          messageId,
+          messageExternalId: input.sendResult.messageExternalId ?? null,
+          messageThreadExternalId: input.sendResult.threadExternalId ?? null,
+          direction: MessageDirection.OUTGOING,
+        });
 
-      const messageThreadId = await this.findOrCreateThread({
-        messageRepository,
-        messageThreadRepository,
-        inReplyTo: input.inReplyTo,
-        subject: input.subject,
-      });
-
-      const messageId = v4();
-
-      await messageRepository.insert({
-        id: messageId,
-        headerMessageId: input.sendResult.headerMessageId,
-        subject: input.subject,
-        text: input.body,
-        receivedAt: new Date(),
-        messageThreadId,
-      });
-
-      const participants = this.buildParticipants(
-        messageId,
-        input.connectedAccount.handle ?? '',
-        input.recipients,
-      );
-
-      if (participants.length > 0) {
-        await messageParticipantRepository.insert(participants);
-      }
-
-      await associationRepository.insert({
-        messageChannelId: input.messageChannelId,
-        messageId,
-        messageExternalId: input.sendResult.messageExternalId ?? null,
-        messageThreadExternalId: input.sendResult.threadExternalId ?? null,
-        direction: MessageDirection.OUTGOING,
-      });
-    }, authContext);
+        return messageId;
+      },
+      authContext,
+    );
   }
 
   private async findOrCreateThread({
