@@ -31,6 +31,7 @@ export const RecordBoardColumnDnd = () => {
             index={index}
             group={RECORD_BOARD_COLUMN_DROPPABLE_ID}
             fill
+            grow
             restrictMovementTo="x"
             collisionDetector={closestCenter}
           >

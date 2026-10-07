@@ -76,6 +76,18 @@ avatar on top, and none of the Home / AI / Settings buttons.
 
 *Tests:* `navigation/components/__tests__/MainNavigationDrawerModeSwitcher.test.tsx` was rewritten for this behaviour.
 
+### 3. Board: columns fill the width
+
+*Why:* Twenty pins each board column to the view's column width with an equal `min-width` and `max-width`, so on a wide
+screen a board of a few columns leaves the right half empty. Widening them from outside needs hashed class names.
+
+*Upstream files touched:*
+- `object-record/record-board/record-board-column/components/RecordBoardColumn.tsx` and `RecordBoardColumnHeader.tsx`:
+  `flex: 1 1 <width>` and no `max-width`: the view's width is a minimum, the columns share the spare room
+- `object-record/record-board/record-board-column/components/RecordBoardColumnDnd.tsx` and
+  `ui/utilities/drag-and-drop/components/DragDropItemSortableCell.tsx`: a new optional `grow` option (off by default,
+  so other users of the cell are unchanged) lets the header cells stretch with their columns
+
 ## Shipping an image
 
 Images are built by `.github/workflows/pinion-image.yaml` on a GitHub runner, never on the production host (a monorepo

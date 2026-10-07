@@ -29,6 +29,7 @@ const SORTABLE_TRANSITION = {
 const StyledSortableRoot = styled.div<{
   $disabled?: boolean;
   $fill?: boolean;
+  $grow?: boolean;
   $isDragSourceFaded?: boolean;
   $isDraggingHighlighted?: boolean;
 }>`
@@ -40,6 +41,7 @@ const StyledSortableRoot = styled.div<{
     $isDraggingHighlighted ? themeCssVariables.border.radius.sm : '0'};
   cursor: ${({ $disabled }) => ($disabled ? 'inherit' : 'grab')};
   display: ${({ $fill }) => ($fill ? 'flex' : 'block')};
+  flex-grow: ${({ $grow }) => ($grow ? 1 : 'initial')};
   flex-shrink: ${({ $fill }) => ($fill ? 0 : 'initial')};
   height: ${({ $fill }) => ($fill ? '100%' : 'auto')};
   min-height: 0;
@@ -65,6 +67,8 @@ type DragDropItemSortableCellProps = {
   disabled?: boolean;
   fadeSourceWhileDragging?: boolean;
   fill?: boolean;
+  // Share the row's spare room with the other cells (the board's column headers, which stretch with their columns).
+  grow?: boolean;
   group: string;
   hasTransition?: boolean;
   highlightWhileDragging?: boolean;
@@ -85,6 +89,7 @@ export const DragDropItemSortableCell = ({
   disabled = false,
   fadeSourceWhileDragging = false,
   fill = false,
+  grow = false,
   group,
   hasTransition = true,
   highlightWhileDragging = false,
@@ -170,6 +175,7 @@ export const DragDropItemSortableCell = ({
         ref={setSortableRef}
         $disabled={disabled}
         $fill={fill}
+        $grow={grow}
         $isDragSourceFaded={fadeSourceWhileDragging && isDragSource}
         $isDraggingHighlighted={highlightWhileDragging && isDragging}
         onDragStart={

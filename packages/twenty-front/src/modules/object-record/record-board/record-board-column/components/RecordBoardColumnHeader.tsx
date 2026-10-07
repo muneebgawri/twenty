@@ -87,10 +87,13 @@ const StyledColumn = styled.div`
   background-color: ${themeCssVariables.background.primary};
   display: flex;
   flex-direction: column;
-  max-width: var(
-    ${RECORD_BOARD_COLUMN_WIDTH_CSS_VARIABLE_NAME},
-    ${RECORD_BOARD_COLUMN_WIDTH}px
-  );
+  // Same rule as the column below it (RecordBoardColumn): the width is a minimum and the extra room is shared, so the
+  // header stays aligned with its column.
+  flex: 1 1
+    var(
+      ${RECORD_BOARD_COLUMN_WIDTH_CSS_VARIABLE_NAME},
+      ${RECORD_BOARD_COLUMN_WIDTH}px
+    );
   min-width: var(
     ${RECORD_BOARD_COLUMN_WIDTH_CSS_VARIABLE_NAME},
     ${RECORD_BOARD_COLUMN_WIDTH}px

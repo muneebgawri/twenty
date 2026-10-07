@@ -21,10 +21,13 @@ const StyledColumn = styled.div`
   background-color: ${themeCssVariables.background.primary};
   display: flex;
   flex-direction: column;
-  max-width: var(
-    ${RECORD_BOARD_COLUMN_WIDTH_CSS_VARIABLE_NAME},
-    ${RECORD_BOARD_COLUMN_WIDTH}px
-  );
+  // The view's column width is a minimum: the columns share any extra room, so a wide screen is filled and a narrow
+  // one scrolls. (Stock Twenty pins them to that width with an equal max-width.)
+  flex: 1 1
+    var(
+      ${RECORD_BOARD_COLUMN_WIDTH_CSS_VARIABLE_NAME},
+      ${RECORD_BOARD_COLUMN_WIDTH}px
+    );
   min-width: var(
     ${RECORD_BOARD_COLUMN_WIDTH_CSS_VARIABLE_NAME},
     ${RECORD_BOARD_COLUMN_WIDTH}px
