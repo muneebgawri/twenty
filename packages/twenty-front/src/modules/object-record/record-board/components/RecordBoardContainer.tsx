@@ -13,6 +13,7 @@ import { recordIndexGroupFieldMetadataItemComponentState } from '@/object-record
 import { RecordIndexRemoveSortingModal } from '@/object-record/record-index/components/RecordIndexRemoveSortingModal';
 import { useRecordIndexContextOrThrow } from '@/object-record/record-index/contexts/RecordIndexContext';
 import { getRecordIndexRemoveSortingModalId } from '@/object-record/record-index/utils/getRecordIndexRemoveSortingModalId';
+import { StageGateDialog } from '@/pinion/stage-gate/components/StageGateDialog';
 
 import { isDialogOpenedComponentState } from '@/ui/layout/dialog/states/isDialogOpenedComponentState';
 import { useAtomComponentStateValue } from '@/ui/utilities/state/jotai/hooks/useAtomComponentStateValue';
@@ -84,6 +85,7 @@ export const RecordBoardContainer = ({
       >
         <RecordBoard />
         {isDialogOpened && <RecordIndexRemoveSortingModal />}
+        <StageGateDialog />
         <RecordBoardHotkeyEffect />
         <RecordBoardBodyEscapeHotkeyEffect />
       </RecordBoardComponentInstanceContext.Provider>

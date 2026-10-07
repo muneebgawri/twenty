@@ -4,6 +4,8 @@ import { isDefined } from 'twenty-shared/utils';
 
 import { processGroupDrop } from '@/object-record/record-drag/utils/processGroupDrop';
 
+import { useRequestStageGate } from '@/pinion/stage-gate/hooks/useRequestStageGate';
+
 import { RecordBoardContext } from '@/object-record/record-board/contexts/RecordBoardContext';
 import { isRecordBoardDropProcessingComponentState } from '@/object-record/record-board/states/isRecordBoardDropProcessingComponentState';
 import { useUpdateDroppedRecordOnBoard } from '@/object-record/record-drag/hooks/useUpdateDroppedRecordOnBoard';
@@ -15,6 +17,7 @@ import { useDebouncedCallback } from 'use-debounce';
 export const useProcessBoardCardDrop = () => {
   const store = useStore();
   const { selectFieldMetadataItem } = useContext(RecordBoardContext);
+  const { requestStageGate } = useRequestStageGate();
 
   const recordIndexRecordIdsByGroupCallbackFamilyState =
     useAtomComponentFamilyStateCallbackState(
@@ -50,6 +53,14 @@ export const useProcessBoardCardDrop = () => {
 
       const shouldUpdatePosition = options?.shouldUpdatePosition ?? true;
 
+      // Collected first, then applied: a drop held back for an answer (see useRequestStageGate) runs later, after the
+      // drag state is gone.
+      const updates: {
+        recordId: string;
+        position?: number;
+        targetRecordGroupValue: string | null;
+      }[] = [];
+
       processGroupDrop({
         droppableId,
         draggableId,
@@ -59,23 +70,51 @@ export const useProcessBoardCardDrop = () => {
         recordIdsByGroupFamilyState:
           recordIndexRecordIdsByGroupCallbackFamilyState,
         onUpdateRecord: ({ recordId, position }, targetRecordGroupValue) => {
+          updates.push({ recordId, position, targetRecordGroupValue });
+        },
+      });
+
+      const applyDrop = (extraInput?: Record<string, unknown>) => {
+        for (const { recordId, position, targetRecordGroupValue } of updates) {
           updateDroppedRecordOnBoard(
             {
               recordId,
               position: shouldUpdatePosition ? position : undefined,
+              extraInput,
             },
             targetRecordGroupValue,
           );
-        },
-      });
+        }
 
-      debouncedUpdateDropProcessing(false);
+        debouncedUpdateDropProcessing(false);
+      };
+
+      // Reordering inside the column a card is already in is not entering the stage, so it is never asked.
+      const destinationRecordIds = store.get(
+        recordIndexRecordIdsByGroupCallbackFamilyState(droppableId),
+      ) as string[];
+      const isMovingToAnotherGroup = [draggableId, ...selectedRecordIds].some(
+        (recordId) => !destinationRecordIds.includes(recordId),
+      );
+
+      const isHeldForAnswer =
+        updates.length > 0 &&
+        requestStageGate({
+          destinationValue: updates[0].targetRecordGroupValue,
+          isMovingToAnotherGroup,
+          proceed: applyDrop,
+        });
+
+      if (!isHeldForAnswer) {
+        applyDrop();
+      }
     },
     [
       store,
       selectFieldMetadataItem,
       recordIndexRecordIdsByGroupCallbackFamilyState,
       updateDroppedRecordOnBoard,
+      requestStageGate,
       debouncedUpdateDropProcessing,
     ],
   );

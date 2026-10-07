@@ -36,9 +36,12 @@ export const useUpdateDroppedRecordOnBoard = () => {
       {
         recordId,
         position: newPosition,
+        extraInput,
       }: {
         recordId: string;
         position?: number;
+        // Further fields written in the same update as the move (e.g. a reason required to enter the stage).
+        extraInput?: Record<string, unknown>;
       },
       targetRecordGroupValue: RecordGroupDefinition['value'],
     ) => {
@@ -167,6 +170,7 @@ export const useUpdateDroppedRecordOnBoard = () => {
               'Record',
             [recordGroupColumnName]: targetRecordGroupValue,
             ...(isDefined(newPosition) && { position: newPosition }),
+            ...extraInput,
           } as ObjectRecord,
         ],
       });
@@ -176,6 +180,7 @@ export const useUpdateDroppedRecordOnBoard = () => {
         updateOneRecordInput: {
           [recordGroupColumnName]: targetRecordGroupValue,
           ...(isDefined(newPosition) && { position: newPosition }),
+          ...extraInput,
         },
       });
     },
