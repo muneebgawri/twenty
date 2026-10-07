@@ -49,6 +49,26 @@ not (Twenty has no single write path to intercept). The backstop is the "Lost wi
 
 *Tests:* `stage-gate/**/__tests__/` (matching logic, the hook, the dialog's behaviour).
 
+## Shipping an image
+
+Images are built by `.github/workflows/pinion-image.yaml` on a GitHub runner, never on the production host (a monorepo
+build needs several GB of RAM and that host runs the live CRM). The workflow first verifies the fork's changes
+(typecheck, tests, lint and format of `modules/pinion`), then builds the Dockerfile's `twenty` target and publishes:
+
+    ghcr.io/<owner>/twenty-pinion:<twenty-version>-pinion.<short-sha>      e.g. 2.46.0-pinion.928aff6
+
+There is no moving tag. A deploy names one exact build, and the image carries the upstream base commit as a label
+(`io.pinion.upstream-base`).
+
+**Deploy only a released Twenty version.** Upstream `main` is the next, unreleased version; an image built from it runs
+that version's unreleased database migrations, and migrations cannot be run backwards. Until upstream ships the release
+this branch is based on, images from it are for local and throwaway use only. When it ships, rebase onto the release
+commit (see below), let CI build the image, then layer the overlay patches (`deploy/branding`) on top and test on
+staging before prod.
+
+*One-time setup:* a new GHCR package starts private. Make it public in the package settings (the fork is public and the
+image contains only Twenty and the changes above, no secrets), or give the deploy host a `read:packages` token.
+
 ## Upgrading to a new upstream commit
 
 1. `git fetch upstream` and pick a commit with a clean upstream CI (zero failed check runs).
