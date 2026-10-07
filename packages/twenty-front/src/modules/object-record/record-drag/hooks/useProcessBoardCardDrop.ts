@@ -3,6 +3,8 @@ import { useCallback, useContext } from 'react';
 import { isDefined } from 'twenty-shared/utils';
 import { useDebouncedCallback } from 'use-debounce';
 
+import { useRequestStageGate } from '@/pinion/stage-gate/hooks/useRequestStageGate';
+
 import { RecordBoardContext } from '@/object-record/record-board/contexts/RecordBoardContext';
 import { isRecordBoardDropProcessingComponentState } from '@/object-record/record-board/states/isRecordBoardDropProcessingComponentState';
 import { useUpdateDroppedRecordOnBoard } from '@/object-record/record-drag/hooks/useUpdateDroppedRecordOnBoard';
@@ -24,6 +26,7 @@ export const useProcessBoardCardDrop = () => {
   const { recordIndexId } = useRecordIndexContextOrThrow();
   const { openDialog } = useDialog();
   const { updateDroppedRecordOnBoard } = useUpdateDroppedRecordOnBoard();
+  const { requestStageGate } = useRequestStageGate();
 
   const recordIdsByGroupCallbackState =
     useAtomComponentFamilyStateCallbackState(
@@ -79,27 +82,45 @@ export const useProcessBoardCardDrop = () => {
         throw new Error('Record group is not defined');
       }
 
-      store.set(isRecordBoardDropProcessingCallbackState, true);
+      // Computed now, not when the move runs: the drag state is cleared as soon as this handler returns, and a move
+      // held back for an answer (see useRequestStageGate) runs later.
+      const updatedRecords = computeDroppedRecordPositions({
+        destinationRecordIds: store.get(
+          recordIdsByGroupCallbackState(destinationDroppableId),
+        ),
+        destinationIndex,
+        draggedRecordId,
+        draggedRecordIds: store.get(draggedRecordIdsCallbackState),
+        store,
+      });
 
-      try {
-        const updatedRecords = computeDroppedRecordPositions({
-          destinationRecordIds: store.get(
-            recordIdsByGroupCallbackState(destinationDroppableId),
-          ),
-          destinationIndex,
-          draggedRecordId,
-          draggedRecordIds: store.get(draggedRecordIdsCallbackState),
-          store,
-        });
+      const applyDrop = (extraInput?: Record<string, unknown>) => {
+        store.set(isRecordBoardDropProcessingCallbackState, true);
 
-        for (const { id, position } of updatedRecords) {
-          updateDroppedRecordOnBoard(
-            { recordId: id, position: hasRecordSorts ? undefined : position },
-            destinationRecordGroup.value,
-          );
+        try {
+          for (const { id, position } of updatedRecords) {
+            updateDroppedRecordOnBoard(
+              {
+                recordId: id,
+                position: hasRecordSorts ? undefined : position,
+                extraInput,
+              },
+              destinationRecordGroup.value,
+            );
+          }
+        } finally {
+          debouncedUpdateDropProcessing(false);
         }
-      } finally {
-        debouncedUpdateDropProcessing(false);
+      };
+
+      const isHeldForAnswer = requestStageGate({
+        destinationValue: destinationRecordGroup.value,
+        isMovingToAnotherGroup: sourceDroppableId !== destinationDroppableId,
+        proceed: applyDrop,
+      });
+
+      if (!isHeldForAnswer) {
+        applyDrop();
       }
     },
     [
@@ -108,6 +129,7 @@ export const useProcessBoardCardDrop = () => {
       recordIndexId,
       openDialog,
       updateDroppedRecordOnBoard,
+      requestStageGate,
       debouncedUpdateDropProcessing,
       recordIdsByGroupCallbackState,
       draggedRecordIdsCallbackState,

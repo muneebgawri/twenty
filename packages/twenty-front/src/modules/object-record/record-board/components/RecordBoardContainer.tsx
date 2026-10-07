@@ -11,6 +11,7 @@ import { RecordBoardComponentInstanceContext } from '@/object-record/record-boar
 import { recordIndexGroupFieldMetadataItemComponentState } from '@/object-record/record-index/states/recordIndexGroupFieldMetadataComponentState';
 
 import { RecordIndexRemoveSortingModal } from '@/object-record/record-index/components/RecordIndexRemoveSortingModal';
+import { StageGateDialog } from '@/pinion/stage-gate/components/StageGateDialog';
 
 import { useAtomComponentStateValue } from '@/ui/utilities/state/jotai/hooks/useAtomComponentStateValue';
 import { isDefined } from 'twenty-shared/utils';
@@ -74,6 +75,7 @@ export const RecordBoardContainer = ({
       >
         <RecordBoard />
         <RecordIndexRemoveSortingModal />
+        <StageGateDialog />
         <RecordBoardHotkeyEffect />
         <RecordBoardBodyEscapeHotkeyEffect />
       </RecordBoardComponentInstanceContext.Provider>
