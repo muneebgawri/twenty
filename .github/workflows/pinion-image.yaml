@@ -7,20 +7,20 @@ name: Pinion image
 # workflow run) instead of "whatever the box had".
 #
 # Image:  ghcr.io/<owner>/twenty-pinion:<app-version>-pinion.<short-sha>
-#   e.g.  ghcr.io/muneebgawri/twenty-pinion:2.46.0-pinion.928aff6
+#   e.g.  ghcr.io/muneebgawri/twenty-pinion:2.45.6-pinion.1a2b3c4
 # There is deliberately NO moving tag (no `latest`, no `main`): a deploy must name one exact build.
 #
 # What this image is: stock Twenty at the pinned upstream commit (see docs/PINION_FORK.md) plus the divergences listed
 # there. It does NOT contain the Pinion overlay patches (row-level security, email gate, Google OAuth); those are
 # layered on top of this image by deploy/branding. It is not deployed by this workflow.
 #
-# RELEASE LINE: `main` upstream is the NEXT, unreleased version. An image built from an unreleased snapshot would run
-# that version's unreleased database migrations on whatever database it starts against, and migrations cannot be run
-# backwards. Only deploy an image whose app version is a released Twenty version.
+# RELEASE LINE: this workflow builds only the `pinion/<minor>` branches, each based on a RELEASED upstream tag
+# (docs/PINION_FORK.md, "Base"). An image built from an unreleased upstream snapshot would run that version's unreleased
+# database migrations on whatever database it starts against, and migrations cannot be run backwards.
 
 on:
   push:
-    branches: [pinion/main]
+    branches: ['pinion/2.*']
     paths-ignore:
       - 'docs/**'
       - '**/*.md'
@@ -59,8 +59,8 @@ jobs:
       - name: Typecheck twenty-front
         run: npx nx typecheck twenty-front
 
-      - name: Test the Pinion modules
-        run: npx jest packages/twenty-front/src/modules/pinion --config=packages/twenty-front/jest.config.mjs
+      - name: Test the Pinion modules and the drawer change
+        run: npx jest packages/twenty-front/src/modules/pinion packages/twenty-front/src/modules/navigation/components/__tests__/MainNavigationDrawerModeSwitcher.test.tsx --config=packages/twenty-front/jest.config.mjs
 
       - name: Lint and format the Pinion modules
         run: |
@@ -86,17 +86,16 @@ jobs:
       - name: Resolve what is being built
         id: build
         run: |
-          # Twenty's version lives in this generated constant (upstream: `npx nx version:bump twenty-server`), which is
-          # also what its upgrade logic compares against. No package.json carries it.
-          app_version="$(grep -oE "TWENTY_CURRENT_VERSION = '[0-9]+\.[0-9]+\.[0-9]+'" \
-            packages/twenty-server/src/engine/core-modules/upgrade/constants/twenty-current-version.constant.ts \
-            | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' || true)"
+          # The version is the upstream RELEASE this branch is based on, read from the fork doc's Base table. Not the version
+          # constant in the source: patch releases do not bump it (2.45.6 still says 2.45.0), and the image's app version
+          # drives the instance's upgrade logic.
+          app_version="$(grep -oE 'twenty/v[0-9]+\.[0-9]+\.[0-9]+' docs/PINION_FORK.md | head -1 | sed 's#twenty/v##' || true)"
           short_sha="$(git rev-parse --short=7 HEAD)"
           # The first 40-hex string in the fork doc is the pinned upstream commit (its "Base" table).
           upstream_base="$(grep -oE '[0-9a-f]{40}' docs/PINION_FORK.md | head -1 || true)"
           # Never publish an image whose version or base could not be read: APP_VERSION is baked into it and drives
           # the instance's upgrade logic, so a wrong value is worse than a failed build.
-          [[ "${app_version}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "::error::could not read the Twenty version (got '${app_version}')"; exit 1; }
+          [[ "${app_version}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "::error::could not read the upstream release from docs/PINION_FORK.md (got '${app_version}')"; exit 1; }
           [[ "${upstream_base}" =~ ^[0-9a-f]{40}$ ]] || { echo "::error::could not read the upstream base commit from docs/PINION_FORK.md"; exit 1; }
           echo "app_version=${app_version}" >> "$GITHUB_OUTPUT"
           echo "tag=${app_version}-pinion.${short_sha}" >> "$GITHUB_OUTPUT"
