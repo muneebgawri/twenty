@@ -114,8 +114,14 @@ export const MainNavigationDrawerModeSwitcher = () => {
   );
   const isMobile = useIsMobile();
   const isExpanded = useIsNavigationDrawerContentExpanded();
-  const modes = useNavigationDrawerModes();
   const activeNavigationDrawerMode = useActiveNavigationDrawerMode();
+  // Pinion shows no Home / AI / Settings buttons: Settings lives in the profile menu and there is no AI provider. The
+  // one button kept is the way back to Home while inside Settings or an AI page.
+  const modes = useNavigationDrawerModes().filter(
+    ({ mode }) =>
+      mode === NAVIGATION_DRAWER_TABS.NAVIGATION_MENU &&
+      activeNavigationDrawerMode !== NAVIGATION_DRAWER_TABS.NAVIGATION_MENU,
+  );
   const { switchNavigationDrawerMode } = useSwitchNavigationDrawerMode();
   const shouldReduceMotion = useReducedMotion();
 

@@ -18,12 +18,14 @@ const StyledContainer = styled.div`
   user-select: none;
 `;
 
-const StyledHeaderRow = styled.div`
+const StyledHeaderRow = styled.div<{ isExpanded: boolean }>`
   align-items: center;
   border-bottom: 1px solid ${themeCssVariables.border.color.medium};
   box-sizing: border-box;
   display: flex;
   height: ${APP_HEADER_HEIGHT}px;
+  justify-content: ${({ isExpanded }) =>
+    isExpanded ? 'flex-start' : 'center'};
   padding: 0 ${themeCssVariables.spacing[2]};
 
   @media (max-width: ${MOBILE_VIEWPORT}px) {
@@ -105,7 +107,7 @@ export const NavigationDrawerHeader = () => {
 
   return (
     <StyledContainer>
-      <StyledHeaderRow>
+      <StyledHeaderRow isExpanded={isExpanded}>
         <StyledWorkspaceDropdownContainer>
           <MultiWorkspaceDropdownButton />
         </StyledWorkspaceDropdownContainer>

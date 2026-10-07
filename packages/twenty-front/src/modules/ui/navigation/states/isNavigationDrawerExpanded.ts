@@ -1,10 +1,9 @@
 import { createAtomState } from '@/ui/utilities/state/jotai/utils/createAtomState';
-import { MOBILE_VIEWPORT } from 'twenty-ui/theme';
 
-const isMobile = window.innerWidth <= MOBILE_VIEWPORT;
-
+// Pinion starts every browser on the module rail (the collapsed drawer). Someone who expands it keeps their choice:
+// it is remembered per browser.
 export const isNavigationDrawerExpandedState = createAtomState<boolean>({
   key: 'isNavigationDrawerExpanded',
-  defaultValue: !isMobile,
+  defaultValue: false,
   useLocalStorage: true,
 });

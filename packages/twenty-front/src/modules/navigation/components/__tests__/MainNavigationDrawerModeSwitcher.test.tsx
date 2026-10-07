@@ -1,7 +1,7 @@
 import { createStore, Provider as JotaiProvider } from 'jotai';
 import { i18n } from '@lingui/core';
 import { I18nProvider } from '@lingui/react';
-import { act, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { IconComment, IconHome, IconSettings } from 'twenty-ui/icon';
 
@@ -74,68 +74,70 @@ describe('MainNavigationDrawerModeSwitcher', () => {
     jest.mocked(useIsNavigationDrawerContentExpanded).mockReturnValue(true);
   });
 
-  it('switches mode from the collapsed icon rail', async () => {
-    jest.mocked(useIsNavigationDrawerContentExpanded).mockReturnValue(false);
-
+  // Pinion shows no Home / AI / Settings buttons (Settings lives in the profile menu, and there is no AI provider).
+  // The one button kept is the way back to Home from a page that is not Home.
+  it('shows no buttons on the home page', () => {
     renderModeSwitcher();
 
-    await userEvent.click(screen.getByRole('button', { name: 'AI' }));
-
-    expect(mockSwitchNavigationDrawerMode).toHaveBeenCalledTimes(1);
-    expect(mockSwitchNavigationDrawerMode).toHaveBeenCalledWith(
-      NAVIGATION_DRAWER_TABS.AI_CHAT_HISTORY,
-    );
-  });
-
-  it('switches mode from the expanded row', async () => {
-    renderModeSwitcher();
-
-    await userEvent.click(screen.getByRole('button', { name: 'Settings' }));
-
-    expect(mockSwitchNavigationDrawerMode).toHaveBeenCalledTimes(1);
-    expect(mockSwitchNavigationDrawerMode).toHaveBeenCalledWith(
-      NAVIGATION_DRAWER_TABS.SETTINGS,
-    );
+    expect(
+      screen.queryByRole('button', { name: 'Home' }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'AI' }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Settings' }),
+    ).not.toBeInTheDocument();
   });
 
   it.each([
-    [true, 'Settings', NAVIGATION_DRAWER_TABS.SETTINGS],
-    [false, 'Settings', NAVIGATION_DRAWER_TABS.SETTINGS],
-    [true, 'AI', NAVIGATION_DRAWER_TABS.AI_CHAT_HISTORY],
-    [false, 'AI', NAVIGATION_DRAWER_TABS.AI_CHAT_HISTORY],
+    ['the collapsed icon rail', false],
+    ['the expanded row', true],
   ] as const)(
-    'disables navigation while editing layout with expanded=%s and mode=%s and restores it afterward',
-    async (isExpanded, label, mode) => {
+    'offers only a way back to Home inside Settings, from %s',
+    async (_description, isExpanded) => {
+      jest
+        .mocked(useActiveNavigationDrawerMode)
+        .mockReturnValue(NAVIGATION_DRAWER_TABS.SETTINGS);
       jest
         .mocked(useIsNavigationDrawerContentExpanded)
         .mockReturnValue(isExpanded);
-      const { store } = renderModeSwitcher(true);
-      const settingsButton = screen.getByRole('button', { name: label });
 
-      expect(settingsButton).toHaveAttribute('aria-disabled', 'true');
-      expect(screen.getByRole('button', { name: 'Home' })).toBeEnabled();
-      expect(screen.getByRole('button', { name: 'Home' })).toHaveAttribute(
-        'aria-disabled',
-        'false',
-      );
+      renderModeSwitcher();
 
-      await userEvent.click(settingsButton);
-      expect(settingsButton).toHaveFocus();
-      await userEvent.keyboard('{Enter} ');
-
-      expect(mockSwitchNavigationDrawerMode).not.toHaveBeenCalled();
-
-      act(() => {
-        store.set(isLayoutCustomizationModeEnabledState.atom, false);
-      });
-
-      expect(settingsButton).toHaveAttribute('aria-disabled', 'false');
-      await userEvent.click(settingsButton);
+      expect(screen.getAllByRole('button')).toHaveLength(1);
+      await userEvent.click(screen.getByRole('button', { name: 'Home' }));
 
       expect(mockSwitchNavigationDrawerMode).toHaveBeenCalledTimes(1);
-      expect(mockSwitchNavigationDrawerMode).toHaveBeenCalledWith(mode);
+      expect(mockSwitchNavigationDrawerMode).toHaveBeenCalledWith(
+        NAVIGATION_DRAWER_TABS.NAVIGATION_MENU,
+      );
     },
   );
+
+  it('offers only a way back to Home on an AI page', () => {
+    jest
+      .mocked(useActiveNavigationDrawerMode)
+      .mockReturnValue(NAVIGATION_DRAWER_TABS.AI_CHAT_HISTORY);
+
+    renderModeSwitcher();
+
+    expect(screen.getAllByRole('button')).toHaveLength(1);
+    expect(screen.getByRole('button', { name: 'Home' })).toBeEnabled();
+  });
+
+  it('keeps the way back to Home usable while the layout is being edited', () => {
+    jest
+      .mocked(useActiveNavigationDrawerMode)
+      .mockReturnValue(NAVIGATION_DRAWER_TABS.SETTINGS);
+
+    renderModeSwitcher(true);
+
+    expect(screen.getByRole('button', { name: 'Home' })).toHaveAttribute(
+      'aria-disabled',
+      'false',
+    );
+  });
 
   it('renders nothing when no mode is available', () => {
     jest.mocked(useNavigationDrawerModes).mockReturnValue([]);

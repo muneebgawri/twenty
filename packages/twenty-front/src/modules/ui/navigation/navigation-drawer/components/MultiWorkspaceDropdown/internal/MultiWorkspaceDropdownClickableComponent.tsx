@@ -34,6 +34,7 @@ export const MultiWorkspaceDropdownClickableComponent = ({
       disabled={disabled}
     >
       <Avatar
+        size={isNavigationDrawerExpanded ? 'md' : 'xl'}
         name={currentWorkspace?.displayName || ''}
         colorSeed={getWorkspaceAvatarColorSeed(currentWorkspace?.displayName)}
         src={getAbsoluteImageUrl(

@@ -4,6 +4,10 @@ import { useIsNavigationDrawerContentExpanded } from '@/navigation/hooks/useIsNa
 import { TooltipDelay } from '@/ui/layout/tooltip/constants/TooltipDelay';
 import { NavigationDrawerAnimatedCollapseWrapper } from '@/ui/navigation/navigation-drawer/components/NavigationDrawerAnimatedCollapseWrapper';
 import { NavigationDrawerItemBreadcrumb } from '@/ui/navigation/navigation-drawer/components/NavigationDrawerItemBreadcrumb';
+import {
+  PINION_RAIL_ITEM_MIN_HEIGHT,
+  PINION_RAIL_ITEM_WIDTH,
+} from '@/pinion/shell/constants/PinionRail';
 import { NAVIGATION_DRAWER_COLLAPSED_BUTTON_SIZE } from '@/ui/navigation/navigation-drawer/constants/NavigationDrawerCollapsedButtonSize';
 import { NavigationDrawerItemEditingContext } from '@/ui/navigation/navigation-drawer/contexts/NavigationDrawerItemEditingContext';
 import { useNavigationDrawerTooltip } from '@/ui/navigation/navigation-drawer/hooks/useNavigationDrawerTooltip';
@@ -73,19 +77,22 @@ const StyledItem = styled.button<StyledItemProps>`
     isDragging ? 'grabbing' : isSoon ? 'default' : 'pointer'};
   display: flex;
   font-family: ${themeCssVariables.font.family};
-  font-size: ${themeCssVariables.font.size.md};
-  height: ${({ isNavigationDrawerExpanded }) =>
+  font-size: ${({ isNavigationDrawerExpanded }) =>
     isNavigationDrawerExpanded
-      ? themeCssVariables.spacing[7]
-      : `${NAVIGATION_DRAWER_COLLAPSED_BUTTON_SIZE}px`};
+      ? themeCssVariables.font.size.md
+      : themeCssVariables.font.size.xs};
+  height: ${({ isNavigationDrawerExpanded }) =>
+    isNavigationDrawerExpanded ? themeCssVariables.spacing[7] : 'auto'};
   margin-top: ${({ indentationLevel }) =>
     indentationLevel === 2 ? '2px' : '0'};
+  min-height: ${({ isNavigationDrawerExpanded }) =>
+    isNavigationDrawerExpanded ? '0' : `${PINION_RAIL_ITEM_MIN_HEIGHT}px`};
   min-width: 0;
   padding-bottom: ${themeCssVariables.spacing[1]};
   padding-left: ${({ isNavigationDrawerExpanded }) =>
     isNavigationDrawerExpanded
       ? themeCssVariables.spacing[1]
-      : `calc(${themeCssVariables.spacing[2]} - 1px)`};
+      : themeCssVariables.spacing['0.5']};
   padding-right: ${({ hasRightOptions, isNavigationDrawerExpanded }) =>
     hasRightOptions && isNavigationDrawerExpanded
       ? themeCssVariables.spacing['0.5']
@@ -97,7 +104,7 @@ const StyledItem = styled.button<StyledItemProps>`
   user-select: none;
   width: ${({ isNavigationDrawerExpanded, hasRightOptions }) =>
     !isNavigationDrawerExpanded
-      ? `${NAVIGATION_DRAWER_COLLAPSED_BUTTON_SIZE}px`
+      ? `${PINION_RAIL_ITEM_WIDTH}px`
       : `calc(100% - ${themeCssVariables.spacing['1.5']} + ${themeCssVariables.spacing[1]} + ${hasRightOptions ? themeCssVariables.spacing['0.5'] : themeCssVariables.spacing[1]})`};
 
   &:hover {
@@ -117,16 +124,22 @@ const StyledItem = styled.button<StyledItemProps>`
   }
 `;
 
-const StyledItemElementsContainer = styled.div`
+// Collapsed (the rail), the icon sits over the label instead of beside it.
+const StyledItemElementsContainer = styled.div<{ isRail: boolean }>`
   align-items: center;
   display: flex;
+  flex-direction: ${({ isRail }) => (isRail ? 'column' : 'row')};
+  gap: ${({ isRail }) => (isRail ? themeCssVariables.spacing['0.5'] : '0')};
+  justify-content: ${({ isRail }) => (isRail ? 'center' : 'flex-start')};
   width: 100%;
 `;
 
-const StyledLabelParent = styled.div`
+const StyledLabelParent = styled.div<{ isRail: boolean }>`
   align-items: center;
   display: flex;
-  flex: 1 1 auto;
+  flex: ${({ isRail }) => (isRail ? '0 0 auto' : '1 1 auto')};
+  justify-content: ${({ isRail }) => (isRail ? 'center' : 'flex-start')};
+  max-width: 100%;
   min-width: 0px;
   overflow: hidden;
   text-overflow: clip;
@@ -151,13 +164,14 @@ const StyledSpacer = styled.span`
   flex-grow: 1;
 `;
 
-const StyledIcon = styled.div`
+const StyledIcon = styled.div<{ isRail: boolean }>`
   align-items: center;
   display: flex;
   flex-grow: 0;
   flex-shrink: 0;
   justify-content: center;
-  margin-right: ${themeCssVariables.spacing[2]};
+  margin-right: ${({ isRail }) =>
+    isRail ? '0' : themeCssVariables.spacing[2]};
 `;
 
 const StyledRightOptionsContainer = styled.div`
@@ -323,7 +337,7 @@ export const NavigationDrawerItem = ({
           rel={isExternalLink ? 'noopener noreferrer' : undefined}
           draggable={isInternalLink ? false : undefined}
         >
-          <StyledItemElementsContainer>
+          <StyledItemElementsContainer isRail={!isExpanded}>
             {showBreadcrumb && (
               <NavigationDrawerAnimatedCollapseWrapper>
                 <NavigationDrawerItemBreadcrumb state={subItemState} />
@@ -331,10 +345,12 @@ export const NavigationDrawerItem = ({
             )}
 
             {editingContent ? (
-              <StyledIcon>{editingContent.icon}</StyledIcon>
+              <StyledIcon isRail={!isExpanded}>
+                {editingContent.icon}
+              </StyledIcon>
             ) : (
               isDefined(Icon) && (
-                <StyledIcon>
+                <StyledIcon isRail={!isExpanded}>
                   <Icon
                     size={theme.icon.size.md}
                     stroke={theme.icon.stroke.md}
@@ -348,7 +364,7 @@ export const NavigationDrawerItem = ({
               )
             )}
 
-            <StyledLabelParent>
+            <StyledLabelParent isRail={!isExpanded}>
               {editingContent?.label ?? (
                 <OverflowingTextWithTooltip
                   text={

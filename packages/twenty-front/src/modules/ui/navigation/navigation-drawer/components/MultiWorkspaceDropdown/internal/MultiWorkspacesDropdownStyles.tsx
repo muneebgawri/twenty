@@ -1,4 +1,7 @@
-import { NAVIGATION_DRAWER_COLLAPSED_BUTTON_SIZE } from '@/ui/navigation/navigation-drawer/constants/NavigationDrawerCollapsedButtonSize';
+import {
+  PINION_RAIL_ITEM_MIN_HEIGHT,
+  PINION_RAIL_ITEM_WIDTH,
+} from '@/pinion/shell/constants/PinionRail';
 import { styled } from '@linaria/react';
 import { IconChevronDown } from 'twenty-ui/icon';
 import { themeCssVariables } from 'twenty-ui/theme';
@@ -19,19 +22,19 @@ export const StyledContainer = styled.div<{
   height: ${({ isNavigationDrawerExpanded }) =>
     isNavigationDrawerExpanded
       ? themeCssVariables.spacing[7]
-      : `${NAVIGATION_DRAWER_COLLAPSED_BUTTON_SIZE}px`};
+      : `${PINION_RAIL_ITEM_MIN_HEIGHT}px`};
+  justify-content: ${({ isNavigationDrawerExpanded }) =>
+    isNavigationDrawerExpanded ? 'flex-start' : 'center'};
   max-width: 100%;
   min-width: 0;
   opacity: ${({ disabled }) => (disabled ? 0.5 : 1)};
   padding: ${({ isNavigationDrawerExpanded }) =>
     isNavigationDrawerExpanded
       ? `calc(${themeCssVariables.spacing[1]} - 1px)`
-      : `calc(${themeCssVariables.spacing[2]} - 1px)`};
+      : '0'};
   pointer-events: ${({ disabled }) => (disabled ? 'none' : 'auto')};
   width: ${({ isNavigationDrawerExpanded }) =>
-    isNavigationDrawerExpanded
-      ? 'fit-content'
-      : `${NAVIGATION_DRAWER_COLLAPSED_BUTTON_SIZE}px`};
+    isNavigationDrawerExpanded ? 'fit-content' : `${PINION_RAIL_ITEM_WIDTH}px`};
 
   &:hover {
     background-color: ${({ disabled }) =>
