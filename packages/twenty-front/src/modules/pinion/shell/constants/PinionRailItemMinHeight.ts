@@ -1,0 +1,1 @@
+export const PINION_RAIL_ITEM_MIN_HEIGHT = 48;

@@ -1,7 +1,5 @@
-import {
-  PINION_RAIL_ITEM_MIN_HEIGHT,
-  PINION_RAIL_ITEM_WIDTH,
-} from '@/pinion/shell/constants/PinionRail';
+import { PINION_RAIL_ITEM_MIN_HEIGHT } from '@/pinion/shell/constants/PinionRailItemMinHeight';
+import { PINION_RAIL_ITEM_WIDTH } from '@/pinion/shell/constants/PinionRailItemWidth';
 import { styled } from '@linaria/react';
 import { IconChevronDown } from 'twenty-ui/icon';
 import { themeCssVariables } from 'twenty-ui/theme';

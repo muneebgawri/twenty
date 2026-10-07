@@ -4,10 +4,9 @@ import { useIsNavigationDrawerContentExpanded } from '@/navigation/hooks/useIsNa
 import { TooltipDelay } from '@/ui/layout/tooltip/constants/TooltipDelay';
 import { NavigationDrawerAnimatedCollapseWrapper } from '@/ui/navigation/navigation-drawer/components/NavigationDrawerAnimatedCollapseWrapper';
 import { NavigationDrawerItemBreadcrumb } from '@/ui/navigation/navigation-drawer/components/NavigationDrawerItemBreadcrumb';
-import {
-  PINION_RAIL_ITEM_MIN_HEIGHT,
-  PINION_RAIL_ITEM_WIDTH,
-} from '@/pinion/shell/constants/PinionRail';
+import { PINION_RAIL_ITEM_MIN_HEIGHT } from '@/pinion/shell/constants/PinionRailItemMinHeight';
+import { PINION_RAIL_LABEL_FONT_SIZE } from '@/pinion/shell/constants/PinionRailLabelFontSize';
+import { PINION_RAIL_ITEM_WIDTH } from '@/pinion/shell/constants/PinionRailItemWidth';
 import { NAVIGATION_DRAWER_COLLAPSED_BUTTON_SIZE } from '@/ui/navigation/navigation-drawer/constants/NavigationDrawerCollapsedButtonSize';
 import { NavigationDrawerItemEditingContext } from '@/ui/navigation/navigation-drawer/contexts/NavigationDrawerItemEditingContext';
 import { useNavigationDrawerTooltip } from '@/ui/navigation/navigation-drawer/hooks/useNavigationDrawerTooltip';
@@ -80,7 +79,7 @@ const StyledItem = styled.button<StyledItemProps>`
   font-size: ${({ isNavigationDrawerExpanded }) =>
     isNavigationDrawerExpanded
       ? themeCssVariables.font.size.md
-      : themeCssVariables.font.size.xs};
+      : PINION_RAIL_LABEL_FONT_SIZE};
   height: ${({ isNavigationDrawerExpanded }) =>
     isNavigationDrawerExpanded ? themeCssVariables.spacing[7] : 'auto'};
   margin-top: ${({ indentationLevel }) =>

@@ -204,14 +204,12 @@ export const MultiWorkspaceDropdownDefaultComponents = () => {
         </>
       )}
       <DropdownMenuItemsContainer>
-        {/* Desktop reaches settings from the drawer's mode switcher, which
-            mobile does not render, so the workspace menu is where it lives. */}
-        {isMobile && (
-          <ListItem
-            startIcon={<IconSettings />}
-            onClick={handleSettings}
-          >{t`Settings`}</ListItem>
-        )}
+        {/* Settings is reached from here on every device: this fork's drawer has
+            no mode-switcher buttons (see the module rail in docs/PINION_FORK.md). */}
+        <ListItem
+          startIcon={<IconSettings />}
+          onClick={handleSettings}
+        >{t`Settings`}</ListItem>
         <ListItem
           startIcon={
             <SelectOptionIcon
