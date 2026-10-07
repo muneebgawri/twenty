@@ -59,7 +59,7 @@ not (Twenty has no single write path to intercept). The backstop is the "Lost wi
 overwhelming to them. The collapsed drawer becomes that rail: an icon over a short label, a larger centred workspace
 avatar on top, and none of the Home / AI / Settings buttons.
 
-*New code* (isolated): `packages/twenty-front/src/modules/pinion/shell/constants/` (`PinionRail*.ts`: rail width, item width and height, label size)
+*New code* (isolated): `packages/twenty-front/src/modules/pinion/shell/`: `constants/PinionRail*.ts` (rail width, item width and height, label size) and `components/PinionChatLauncher.tsx` (the floating chat button, bottom right, opens the AI chat in the side panel; hidden on mobile, without the AI permission, and while the side panel is open)
 
 *Upstream files touched* (small, named edits):
 - `ui/layout/resizable-panel/constants/NavigationDrawerCollapsedWidth.ts`: the collapsed width is the rail's
@@ -70,7 +70,8 @@ avatar on top, and none of the Home / AI / Settings buttons.
 - `navigation/components/MainNavigationDrawerModeSwitcher.tsx`: no mode buttons on Home; while inside Settings or an AI
   page one button leads back to Home
 - `ui/navigation/navigation-drawer/components/MultiWorkspaceDropdown/internal/MultiWorkspaceDropdownDefaultComponents.tsx`:
-  the profile menu lists Settings on desktop too (stock lists it on mobile only)
+  the profile menu lists Settings on desktop too (stock lists it on mobile only), just above "Invite user"
+- `ui/layout/page/components/DefaultLayout.tsx`: mounts `<PinionChatLauncher />`
 - `ui/navigation/states/isNavigationDrawerExpanded.ts`: a browser starts on the rail; expanding it is remembered
 
 *Tests:* `navigation/components/__tests__/MainNavigationDrawerModeSwitcher.test.tsx` was rewritten for this behaviour.

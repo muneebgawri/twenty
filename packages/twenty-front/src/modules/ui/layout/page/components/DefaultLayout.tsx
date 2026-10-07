@@ -8,6 +8,7 @@ import { LayoutCustomizationBar } from '@/layout-customization/components/Layout
 import { AppNavigationDrawer } from '@/navigation/components/AppNavigationDrawer';
 import { MobileNavigationBar } from '@/navigation/components/MobileNavigationBar';
 import { PageDragDropProvider } from '@/navigation-menu-item/display/dnd/providers/PageDragDropProvider';
+import { PinionChatLauncher } from '@/pinion/shell/components/PinionChatLauncher';
 import { useShowFullscreen } from '@/ui/layout/fullscreen/hooks/useShowFullscreen';
 import { useIsMobile } from 'twenty-ui/utilities';
 import { styled } from '@linaria/react';
@@ -98,6 +99,7 @@ export const DefaultLayout = () => {
               </PageDragDropProvider>
             </StyledPageContainer>
             {isMobile && <MobileNavigationBar />}
+            <PinionChatLauncher />
           </AppErrorBoundary>
         </StyledLayout>
       </FileUploadProvider>

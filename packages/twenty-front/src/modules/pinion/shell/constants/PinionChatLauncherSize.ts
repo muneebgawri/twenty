@@ -1,0 +1,1 @@
+export const PINION_CHAT_LAUNCHER_SIZE = 48;

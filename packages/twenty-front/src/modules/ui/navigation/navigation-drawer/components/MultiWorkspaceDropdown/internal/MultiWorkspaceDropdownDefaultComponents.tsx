@@ -204,12 +204,6 @@ export const MultiWorkspaceDropdownDefaultComponents = () => {
         </>
       )}
       <DropdownMenuItemsContainer>
-        {/* Settings is reached from here on every device: this fork's drawer has
-            no mode-switcher buttons (see the module rail in docs/PINION_FORK.md). */}
-        <ListItem
-          startIcon={<IconSettings />}
-          onClick={handleSettings}
-        >{t`Settings`}</ListItem>
         <ListItem
           startIcon={
             <SelectOptionIcon
@@ -234,6 +228,12 @@ export const MultiWorkspaceDropdownDefaultComponents = () => {
             onClick={() => setMultiWorkspaceDropdown('open-record-in')}
           >{t`Open in`}</ListItem>
         )}
+        {/* Settings is reached from here on every device: this fork's drawer has
+            no mode-switcher buttons (see the module rail in docs/PINION_FORK.md). */}
+        <ListItem
+          startIcon={<IconSettings />}
+          onClick={handleSettings}
+        >{t`Settings`}</ListItem>
         <UndecoratedLink
           to={`${getSettingsPath(SettingsPath.WorkspaceMembersPage)}#invite`}
           onClick={() => {
