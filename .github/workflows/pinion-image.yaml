@@ -86,10 +86,18 @@ jobs:
       - name: Resolve what is being built
         id: build
         run: |
-          app_version="$(node -p "require('./packages/twenty-server/package.json').version")"
+          # Twenty's version lives in this generated constant (upstream: `npx nx version:bump twenty-server`), which is
+          # also what its upgrade logic compares against. No package.json carries it.
+          app_version="$(grep -oE "TWENTY_CURRENT_VERSION = '[0-9]+\.[0-9]+\.[0-9]+'" \
+            packages/twenty-server/src/engine/core-modules/upgrade/constants/twenty-current-version.constant.ts \
+            | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' || true)"
           short_sha="$(git rev-parse --short=7 HEAD)"
           # The first 40-hex string in the fork doc is the pinned upstream commit (its "Base" table).
-          upstream_base="$(grep -oE '[0-9a-f]{40}' docs/PINION_FORK.md | head -1)"
+          upstream_base="$(grep -oE '[0-9a-f]{40}' docs/PINION_FORK.md | head -1 || true)"
+          # Never publish an image whose version or base could not be read: APP_VERSION is baked into it and drives
+          # the instance's upgrade logic, so a wrong value is worse than a failed build.
+          [[ "${app_version}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "::error::could not read the Twenty version (got '${app_version}')"; exit 1; }
+          [[ "${upstream_base}" =~ ^[0-9a-f]{40}$ ]] || { echo "::error::could not read the upstream base commit from docs/PINION_FORK.md"; exit 1; }
           echo "app_version=${app_version}" >> "$GITHUB_OUTPUT"
           echo "tag=${app_version}-pinion.${short_sha}" >> "$GITHUB_OUTPUT"
           echo "upstream_base=${upstream_base}" >> "$GITHUB_OUTPUT"
